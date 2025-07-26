@@ -8,7 +8,45 @@ const asyncHandler = require('../utils/asyncHandler');
  * @access  Public
  */
 const register = asyncHandler(async (req, res) => {
+  console.log('注册请求数据:', {
+    body: req.body,
+    headers: req.headers['content-type'],
+    method: req.method
+  });
+  
   const { username, email, password, profile = {} } = req.body;
+
+  // 验证必需字段
+  if (!username || !email || !password) {
+    return res.status(400).json({
+      success: false,
+      message: '用户名、邮箱和密码都是必需的'
+    });
+  }
+
+  // 验证输入格式
+  if (username.length < 3) {
+    return res.status(400).json({
+      success: false,
+      message: '用户名至少需要3个字符'
+    });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({
+      success: false,
+      message: '密码至少需要6个字符'
+    });
+  }
+
+  // 验证邮箱格式
+  const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({
+      success: false,
+      message: '请提供有效的邮箱地址'
+    });
+  }
 
   // 检查用户是否已存在
   const existingUser = await User.findOne({
@@ -23,18 +61,47 @@ const register = asyncHandler(async (req, res) => {
   }
 
   // 创建用户
-  const user = await User.create({
-    username,
-    email,
-    password,
-    profile: {
-      firstName: profile.firstName,
-      lastName: profile.lastName,
-      phone: profile.phone,
-      department: profile.department,
-      position: profile.position || '员工'
+  let user;
+  try {
+    user = await User.create({
+      username,
+      email,
+      password,
+      profile: {
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        phone: profile.phone,
+        department: profile.department,
+        position: profile.position || '员工'
+      }
+    });
+  } catch (error) {
+    console.error('数据库错误:', error);
+    
+    // 处理重复键错误
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyValue)[0];
+      return res.status(400).json({
+        success: false,
+        message: `${field === 'email' ? '邮箱' : '用户名'}已存在`
+      });
     }
-  });
+    
+    // 处理验证错误
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: messages.join(', ')
+      });
+    }
+    
+    // 其他错误
+    return res.status(500).json({
+      success: false,
+      message: '服务器内部错误'
+    });
+  }
 
   // 生成JWT令牌
   const token = user.getSignedJwtToken();
