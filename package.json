@@ -7,6 +7,8 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd server && npm run dev",
     "client": "cd client && npm start",
+    "start-server-only": "cd server && npm start",
+    "start-clacky": "concurrently \"cd server && npm start\" \"cd client && npm start\"",
     "install-server": "cd server && npm install",
     "install-client": "cd client && npm install",
     "install-all": "npm install && npm run install-server && npm run install-client",

@@ -98,10 +98,10 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, async () => {
+const server = app.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 智能工作助手服务器启动成功`);
-  console.log(`📍 服务器地址: http://localhost:${PORT}`);
-  console.log(`📚 API文档: http://localhost:${PORT}/api-docs`);
+  console.log(`📍 服务器地址: http://0.0.0.0:${PORT}`);
+  console.log(`📚 API文档: http://0.0.0.0:${PORT}/api-docs`);
   console.log(`🌍 环境: ${process.env.NODE_ENV || 'development'}`);
   console.log(`⚡ 进程ID: ${process.pid}`);
   

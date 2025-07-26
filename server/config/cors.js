@@ -9,16 +9,21 @@ const corsConfig = {
       return callback(null, true);
     }
     
-    // 生产环境的白名单
+    // 生产环境和Clacky环境的白名单
     const allowedOrigins = [
       'http://localhost:3000',
       'https://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://0.0.0.0:3000',
       process.env.CLIENT_URL,
     ].filter(Boolean);
     
+    // 支持Clacky环境域名
+    const clackyDomainPattern = /^https?:\/\/.*\.clackypaas\.com$/;
+    
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    if (allowedOrigins.indexOf(origin) !== -1 || clackyDomainPattern.test(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
