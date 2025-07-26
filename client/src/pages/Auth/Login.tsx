@@ -58,9 +58,21 @@ const Login: React.FC = () => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // 前端验证
+    if (!registerData.username || registerData.username.length < 3) {
+      return;
+    }
+    if (!registerData.email || !registerData.email.includes('@')) {
+      return;
+    }
+    if (!registerData.password || registerData.password.length < 6) {
+      return;
+    }
     if (registerData.password !== registerData.confirmPassword) {
       return;
     }
+    
     try {
       const { confirmPassword, ...userData } = registerData;
       await register(userData);
@@ -264,6 +276,8 @@ const Login: React.FC = () => {
                     value={registerData.username}
                     onChange={(e) => setRegisterData({ ...registerData, username: e.target.value })}
                     required
+                    inputProps={{ minLength: 3, maxLength: 30 }}
+                    helperText="用户名至少3-30个字符"
                     sx={{ mb: 2 }}
                   />
 
@@ -284,6 +298,8 @@ const Login: React.FC = () => {
                     value={registerData.password}
                     onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
                     required
+                    inputProps={{ minLength: 6 }}
+                    helperText="密码至少6个字符"
                     sx={{ mb: 2 }}
                   />
 

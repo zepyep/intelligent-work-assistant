@@ -30,6 +30,9 @@ connectDB();
 // 安全中间件
 app.use(helmet());
 
+// 启用 trust proxy 支持反向代理
+app.set('trust proxy', true);
+
 // 跨域配置
 const corsConfig = require('./config/cors');
 app.use(cors(corsConfig));
