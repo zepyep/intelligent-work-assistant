@@ -30,8 +30,13 @@ connectDB();
 // 安全中间件
 app.use(helmet());
 
-// 启用 trust proxy 支持反向代理
-app.set('trust proxy', true);
+// 在开发环境中启用 trust proxy 支持反向代理，生产环境应该使用更具体的配置
+if (process.env.NODE_ENV === 'development') {
+  app.set('trust proxy', true);
+} else {
+  // 生产环境中使用更安全的配置
+  app.set('trust proxy', 1); // 信任第一个代理
+}
 
 // 跨域配置
 const corsConfig = require('./config/cors');
@@ -43,7 +48,13 @@ const limiter = rateLimit({
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // 限制每个IP每15分钟100次请求
   message: {
     error: '请求过于频繁，请稍后再试'
-  }
+  },
+  // 在开发环境中使用标准密钥生成器，生产环境应该使用更安全的配置
+  keyGenerator: (req) => {
+    return req.ip || req.connection.remoteAddress || 'unknown';
+  },
+  // 跳过成功的请求计数（可选）
+  skipSuccessfulRequests: false
 });
 app.use('/api', limiter);
 
