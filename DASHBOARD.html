@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能工作助手 - 仪表板</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f6fa;
+            color: #2c3e50;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .card-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+        }
+
+        .icon-tasks { background: #3498db; }
+        .icon-docs { background: #e74c3c; }
+        .icon-meetings { background: #f39c12; }
+        .icon-calendar { background: #9b59b6; }
+        .icon-social { background: #1abc9c; }
+        .icon-wechat { background: #2ecc71; }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .card-content {
+            color: #7f8c8d;
+            line-height: 1.6;
+        }
+
+        .stats {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .stat {
+            flex: 1;
+            text-align: center;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #3498db;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #7f8c8d;
+            margin-top: 0.5rem;
+        }
+
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.3s;
+            text-decoration: none;
+            display: inline-block;
+            margin: 0.5rem 0.5rem 0.5rem 0;
+        }
+
+        .btn:hover {
+            background: #2980b9;
+        }
+
+        .btn-success { background: #2ecc71; }
+        .btn-success:hover { background: #27ae60; }
+
+        .btn-warning { background: #f39c12; }
+        .btn-warning:hover { background: #e67e22; }
+
+        .btn-danger { background: #e74c3c; }
+        .btn-danger:hover { background: #c0392b; }
+
+        .quick-actions {
+            background: white;
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .recent-activity {
+            background: white;
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .activity-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .activity-icon {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            background: #3498db;
+            color: white;
+        }
+
+        .activity-content {
+            flex: 1;
+        }
+
+        .activity-title {
+            font-weight: 500;
+            color: #2c3e50;
+        }
+
+        .activity-time {
+            font-size: 0.8rem;
+            color: #7f8c8d;
+            margin-top: 0.2rem;
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+
+            .container {
+                padding: 0 1rem;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                text-align: center;
+            }
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">🚀 智能工作助手</div>
+            <div class="user-info">
+                <div class="avatar" id="userAvatar">👤</div>
+                <div>
+                    <div id="userName">加载中...</div>
+                    <div style="font-size: 0.9rem; opacity: 0.8;" id="userRole">用户</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="loadingSection" class="loading">
+            <div class="spinner"></div>
+            <p>正在加载用户数据...</p>
+        </div>
+
+        <div id="dashboardContent" style="display: none;">
+            <div class="quick-actions">
+                <h2>🚀 快速操作</h2>
+                <div class="action-buttons">
+                    <button class="btn btn-success" onclick="createTask()">➕ 创建新任务</button>
+                    <button class="btn" onclick="testAI()">🤖 测试AI功能</button>
+                    <button class="btn btn-warning" onclick="uploadDocument()">📄 上传文档</button>
+                    <a href="http://localhost:3000" class="btn" target="_blank">🎯 打开主应用</a>
+                    <a href="http://localhost:5000/api-docs" class="btn" target="_blank">📚 API文档</a>
+                    <button class="btn btn-danger" onclick="logout()">🚪 退出登录</button>
+                </div>
+            </div>
+
+            <div class="grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon icon-tasks">📋</div>
+                        <div class="card-title">任务管理</div>
+                    </div>
+                    <div class="card-content">
+                        智能任务规划和进度跟踪，支持AI生成多种执行方案
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="stat-number" id="taskCount">-</div>
+                                <div class="stat-label">总任务数</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-number" id="pendingTasks">-</div>
+                                <div class="stat-label">待处理</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon icon-docs">📄</div>
+                        <div class="card-title">文档分析</div>
+                    </div>
+                    <div class="card-content">
+                        AI驱动的文档解析、摘要生成和智能搜索
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="stat-number" id="docCount">-</div>
+                                <div class="stat-label">文档数量</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-number" id="analysisCount">-</div>
+                                <div class="stat-label">已分析</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon icon-meetings">🎤</div>
+                        <div class="card-title">会议助手</div>
+                    </div>
+                    <div class="card-content">
+                        音频转文字、会议纪要生成和个性化行动清单
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="stat-number" id="meetingCount">-</div>
+                                <div class="stat-label">会议记录</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-number" id="audioHours">-</div>
+                                <div class="stat-label">音频时长(h)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon icon-calendar">📅</div>
+                        <div class="card-title">日程同步</div>
+                    </div>
+                    <div class="card-content">
+                        多平台日程管理，支持Google Calendar和Outlook集成
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="stat-number" id="eventCount">-</div>
+                                <div class="stat-label">今日事件</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-number" id="integrationCount">0</div>
+                                <div class="stat-label">已集成</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon icon-social">👥</div>
+                        <div class="card-title">社交档案</div>
+                    </div>
+                    <div class="card-content">
+                        智能简历分析、用户推荐和协作匹配
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="stat-number" id="connectionCount">-</div>
+                                <div class="stat-label">连接数</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-number" id="matchScore">-</div>
+                                <div class="stat-label">匹配度</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon icon-wechat">💬</div>
+                        <div class="card-title">微信集成</div>
+                    </div>
+                    <div class="card-content">
+                        微信公众号智能助手，支持语音交互和消息推送
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="stat-number" id="wechatStatus">❌</div>
+                                <div class="stat-label">绑定状态</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-number" id="messageCount">-</div>
+                                <div class="stat-label">消息数</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="recent-activity">
+                <h2>📊 最近活动</h2>
+                <div id="activityList">
+                    <div class="activity-item">
+                        <div class="activity-icon">🔐</div>
+                        <div class="activity-content">
+                            <div class="activity-title">系统登录成功</div>
+                            <div class="activity-time">刚刚</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+        let currentUser = null;
+        let authToken = null;
+
+        // 页面加载时初始化
+        window.onload = async function() {
+            // 自动登录管理员账号
+            await autoLogin();
+            
+            // 加载仪表板数据
+            await loadDashboardData();
+        };
+
+        // 自动登录
+        async function autoLogin() {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@example.com',
+                        password: 'admin123'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    authToken = data.data.token;
+                    currentUser = data.data.user;
+                    
+                    // 保存到localStorage
+                    localStorage.setItem('token', authToken);
+                    localStorage.setItem('user', JSON.stringify(currentUser));
+                    
+                    // 更新UI
+                    updateUserInfo();
+                } else {
+                    throw new Error(data.message || '登录失败');
+                }
+            } catch (error) {
+                console.error('自动登录失败:', error);
+                alert('❌ 自动登录失败: ' + error.message);
+            }
+        }
+
+        // 更新用户信息显示
+        function updateUserInfo() {
+            if (currentUser) {
+                document.getElementById('userName').textContent = currentUser.profile.fullName || currentUser.username;
+                document.getElementById('userRole').textContent = currentUser.role === 'admin' ? '管理员' : '用户';
+                document.getElementById('userAvatar').textContent = currentUser.role === 'admin' ? '👑' : '👤';
+                document.getElementById('wechatStatus').textContent = currentUser.wechatBinding?.isVerified ? '✅' : '❌';
+                document.getElementById('integrationCount').textContent = currentUser.calendarIntegrations?.length || 0;
+            }
+        }
+
+        // 加载仪表板数据
+        async function loadDashboardData() {
+            if (!authToken) return;
+
+            try {
+                // 加载任务数据
+                const tasksResponse = await fetch(`${API_BASE}/api/tasks`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const tasksData = await tasksResponse.json();
+                
+                if (tasksData.success) {
+                    document.getElementById('taskCount').textContent = tasksData.data.tasks.length;
+                    const pendingTasks = tasksData.data.tasks.filter(t => t.status === 'pending').length;
+                    document.getElementById('pendingTasks').textContent = pendingTasks;
+                    
+                    // 添加任务活动到活动列表
+                    if (tasksData.data.tasks.length > 0) {
+                        addActivity('📋', `找到 ${tasksData.data.tasks.length} 个任务`, '刚刚');
+                    }
+                }
+
+                // 模拟其他数据
+                document.getElementById('docCount').textContent = '12';
+                document.getElementById('analysisCount').textContent = '8';
+                document.getElementById('meetingCount').textContent = '5';
+                document.getElementById('audioHours').textContent = '2.5';
+                document.getElementById('eventCount').textContent = '3';
+                document.getElementById('connectionCount').textContent = '15';
+                document.getElementById('matchScore').textContent = '85%';
+                document.getElementById('messageCount').textContent = '23';
+
+                // 隐藏加载中，显示内容
+                document.getElementById('loadingSection').style.display = 'none';
+                document.getElementById('dashboardContent').style.display = 'block';
+
+                // 添加系统活动
+                addActivity('🚀', '系统初始化完成', '1分钟前');
+                addActivity('🤖', 'AI服务已连接', '2分钟前');
+                addActivity('📦', '数据库连接成功', '3分钟前');
+
+            } catch (error) {
+                console.error('加载数据失败:', error);
+                document.getElementById('loadingSection').innerHTML = `
+                    <p style="color: red;">❌ 数据加载失败: ${error.message}</p>
+                    <button class="btn" onclick="loadDashboardData()">🔄 重新加载</button>
+                `;
+            }
+        }
+
+        // 添加活动记录
+        function addActivity(icon, title, time) {
+            const activityList = document.getElementById('activityList');
+            const activityItem = document.createElement('div');
+            activityItem.className = 'activity-item';
+            activityItem.innerHTML = `
+                <div class="activity-icon">${icon}</div>
+                <div class="activity-content">
+                    <div class="activity-title">${title}</div>
+                    <div class="activity-time">${time}</div>
+                </div>
+            `;
+            activityList.appendChild(activityItem);
+        }
+
+        // 创建任务
+        async function createTask() {
+            if (!authToken) return;
+
+            const taskTitle = prompt('请输入任务标题:', '新的工作任务');
+            if (!taskTitle) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/tasks`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        title: taskTitle,
+                        description: '通过仪表板创建的任务',
+                        priority: 'medium',
+                        deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ 任务创建成功: ' + data.data.task.title);
+                    addActivity('➕', `创建任务: ${taskTitle}`, '刚刚');
+                    loadDashboardData(); // 刷新数据
+                } else {
+                    alert('❌ 任务创建失败: ' + data.message);
+                }
+            } catch (error) {
+                alert('❌ 任务创建失败: ' + error.message);
+            }
+        }
+
+        // 测试AI功能
+        async function testAI() {
+            if (!authToken) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/ai/task-planning`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        taskDescription: '优化用户体验设计',
+                        timeframe: '2周',
+                        resources: '设计团队3人',
+                        constraints: '预算限制'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ AI任务规划成功!\n' + data.data.plans.slice(0, 1).map(p => p.title).join('\n'));
+                    addActivity('🤖', 'AI任务规划测试成功', '刚刚');
+                } else {
+                    alert('❌ AI测试失败: ' + data.message);
+                }
+            } catch (error) {
+                alert('❌ AI测试失败: ' + error.message);
+            }
+        }
+
+        // 上传文档（模拟）
+        function uploadDocument() {
+            alert('📄 文档上传功能\n\n支持的格式:\n- PDF、Word、Excel\n- 文本文件、Markdown\n- 图片文件\n\n功能特点:\n- AI自动分析\n- 智能摘要生成\n- 关键词提取\n- 相关性搜索');
+            addActivity('📄', '查看文档上传功能', '刚刚');
+        }
+
+        // 退出登录
+        function logout() {
+            if (confirm('确定要退出登录吗？')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>

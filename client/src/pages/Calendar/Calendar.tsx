@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Card,
@@ -48,7 +48,7 @@ import {
   ChevronRight,
   Google,
 } from '@mui/icons-material';
-import { useAuth } from '../../hooks/useAuth';
+
 import { useApi } from '../../contexts/ApiContext';
 import CustomGrid from '../../components/common/CustomGrid';
 const Grid = CustomGrid;
@@ -78,7 +78,6 @@ interface EventFormData {
 }
 
 const Calendar: React.FC = () => {
-  const { user } = useAuth();
   const api = useApi();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,11 +95,44 @@ const Calendar: React.FC = () => {
     type: 'meeting',
   });
 
-  useEffect(() => {
-    loadEvents();
+  const getViewStartDate = useCallback(() => {
+    const date = new Date(currentDate);
+    switch (viewMode) {
+      case 'day':
+        date.setHours(0, 0, 0, 0);
+        return date;
+      case 'week':
+        const dayOfWeek = date.getDay();
+        date.setDate(date.getDate() - dayOfWeek);
+        date.setHours(0, 0, 0, 0);
+        return date;
+      case 'month':
+        date.setDate(1);
+        date.setHours(0, 0, 0, 0);
+        return date;
+      default:
+        return date;
+    }
   }, [currentDate, viewMode]);
 
-  const loadEvents = async () => {
+  const getViewEndDate = useCallback(() => {
+    const startDate = getViewStartDate();
+    const endDate = new Date(startDate);
+    switch (viewMode) {
+      case 'day':
+        endDate.setDate(endDate.getDate() + 1);
+        break;
+      case 'week':
+        endDate.setDate(endDate.getDate() + 7);
+        break;
+      case 'month':
+        endDate.setMonth(endDate.getMonth() + 1);
+        break;
+    }
+    return endDate;
+  }, [getViewStartDate, viewMode]);
+
+  const loadEvents = useCallback(async () => {
     setLoading(true);
     try {
       const response = await api.get('/calendar/events', {
@@ -115,47 +147,53 @@ const Calendar: React.FC = () => {
       // Mock data for demo
       setEvents([
         {
-          _id: '1',
+          _id: '67762a1b8c9d4e5f6789abc1',
           title: '团队周例会',
           description: '讨论本周工作进展和下周计划',
           startTime: '2024-12-23T10:00:00Z',
           endTime: '2024-12-23T11:00:00Z',
           location: '会议室A',
           attendees: ['张三', '李四', '王五'],
-          type: 'meeting',
-          source: 'manual',
-          status: 'confirmed',
+          type: 'meeting' as const,
+          source: 'manual' as const,
+          status: 'confirmed' as const,
           createdAt: '2024-12-20T09:00:00Z',
         },
         {
-          _id: '2',
+          _id: '67762a2c8c9d4e5f6789abc2',
           title: '客户需求沟通',
           description: '与客户讨论新功能需求',
           startTime: '2024-12-23T14:00:00Z',
           endTime: '2024-12-23T15:30:00Z',
           location: '腾讯会议',
           attendees: ['张三', '客户A'],
-          type: 'meeting',
-          source: 'google',
-          status: 'confirmed',
+          type: 'meeting' as const,
+          source: 'google' as const,
+          status: 'confirmed' as const,
           createdAt: '2024-12-21T08:00:00Z',
         },
         {
-          _id: '3',
+          _id: '67762a3d8c9d4e5f6789abc3',
           title: '项目截止日期提醒',
           description: 'Alpha版本发布',
           startTime: '2024-12-25T09:00:00Z',
           endTime: '2024-12-25T09:30:00Z',
           attendees: [],
-          type: 'reminder',
-          source: 'manual',
-          status: 'confirmed',
+          type: 'reminder' as const,
+          source: 'manual' as const,
+          status: 'confirmed' as const,
           createdAt: '2024-12-22T10:00:00Z',
         }
       ]);
     }
     setLoading(false);
-  };
+  }, [api, getViewStartDate, getViewEndDate]);
+
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
+
+
 
   const handleSyncCalendar = async (provider: 'google' | 'outlook') => {
     setSyncLoading(true);
@@ -189,7 +227,7 @@ const Calendar: React.FC = () => {
       console.error('Failed to create event:', error);
       // For demo, add event locally
       const newEvent: CalendarEvent = {
-        _id: Date.now().toString(),
+        _id: `${Date.now().toString(16)}${Math.random().toString(16).substr(2, 8)}`.padStart(24, '0'),
         ...formData,
         attendees: formData.attendees.split(',').map(a => a.trim()).filter(a => a),
         source: 'manual',
@@ -238,42 +276,7 @@ const Calendar: React.FC = () => {
     });
   };
 
-  const getViewStartDate = () => {
-    const date = new Date(currentDate);
-    switch (viewMode) {
-      case 'day':
-        date.setHours(0, 0, 0, 0);
-        return date;
-      case 'week':
-        const dayOfWeek = date.getDay();
-        date.setDate(date.getDate() - dayOfWeek);
-        date.setHours(0, 0, 0, 0);
-        return date;
-      case 'month':
-        date.setDate(1);
-        date.setHours(0, 0, 0, 0);
-        return date;
-      default:
-        return date;
-    }
-  };
 
-  const getViewEndDate = () => {
-    const startDate = getViewStartDate();
-    const endDate = new Date(startDate);
-    switch (viewMode) {
-      case 'day':
-        endDate.setDate(endDate.getDate() + 1);
-        break;
-      case 'week':
-        endDate.setDate(endDate.getDate() + 7);
-        break;
-      case 'month':
-        endDate.setMonth(endDate.getMonth() + 1);
-        break;
-    }
-    return endDate;
-  };
 
   const navigateDate = (direction: 'prev' | 'next') => {
     const newDate = new Date(currentDate);
@@ -348,7 +351,7 @@ const Calendar: React.FC = () => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     
-    return events.filter(event => {
+    return (events || []).filter(event => {
       const eventDate = new Date(event.startTime);
       return eventDate >= today && eventDate < tomorrow;
     });
@@ -356,7 +359,7 @@ const Calendar: React.FC = () => {
 
   const getUpcomingEvents = () => {
     const now = new Date();
-    return events
+    return (events || [])
       .filter(event => new Date(event.startTime) > now)
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
       .slice(0, 5);
@@ -468,7 +471,7 @@ const Calendar: React.FC = () => {
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <CalendarToday sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
-              <Typography variant="h4">{events.length}</Typography>
+              <Typography variant="h4">{events?.length || 0}</Typography>
               <Typography variant="body2" color="text.secondary">
                 总事件数
               </Typography>
@@ -491,7 +494,7 @@ const Calendar: React.FC = () => {
             <CardContent sx={{ textAlign: 'center' }}>
               <VideoCall sx={{ fontSize: 40, color: 'secondary.main', mb: 1 }} />
               <Typography variant="h4">
-                {events.filter(e => e.type === 'meeting').length}
+                {(events || []).filter(e => e.type === 'meeting').length}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 会议数量
@@ -504,7 +507,7 @@ const Calendar: React.FC = () => {
             <CardContent sx={{ textAlign: 'center' }}>
               <Sync sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
               <Typography variant="h4">
-                {events.filter(e => e.source !== 'manual').length}
+                {(events || []).filter(e => e.source !== 'manual').length}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 已同步事件
@@ -652,9 +655,9 @@ const Calendar: React.FC = () => {
               <Typography variant="h6" gutterBottom>
                 所有事件 ({viewMode === 'day' ? '今日' : viewMode === 'week' ? '本周' : '本月'})
               </Typography>
-              {events.length > 0 ? (
+              {(events || []).length > 0 ? (
                 <List>
-                  {events
+                  {(events || [])
                     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
                     .map((event, index) => (
                     <React.Fragment key={event._id}>
@@ -715,7 +718,7 @@ const Calendar: React.FC = () => {
                           />
                         </Box>
                       </ListItem>
-                      {index < events.length - 1 && <Divider />}
+                      {index < (events || []).length - 1 && <Divider />}
                     </React.Fragment>
                   ))}
                 </List>

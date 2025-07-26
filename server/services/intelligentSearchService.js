@@ -24,7 +24,7 @@ class IntelligentSearchService {
     this.documentIndex = new Map();
     this.semanticIndex = new Map();
     
-    this.initializeSearchIndex();
+    // 索引初始化将在数据库连接后手动调用
   }
 
   /**

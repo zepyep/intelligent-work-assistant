@@ -446,6 +446,89 @@ const addTaskComment = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * 为特定任务生成AI执行计划
+ * @route   POST /api/tasks/:id/generate-plans
+ * @access  Private
+ */
+const generateTaskExecutionPlans = asyncHandler(async (req, res) => {
+  const taskId = req.params.id;
+  
+  try {
+    // 获取任务信息
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        message: '任务不存在'
+      });
+    }
+
+    // 检查权限——任务创建者或分配者可以生成计划
+    if (task.createdBy.toString() !== req.user.id && 
+        task.assignedTo && task.assignedTo.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: '无权为这个任务生成计划'
+      });
+    }
+
+    // 获取用户职位信息
+    const user = await User.findById(req.user.id);
+    const userPosition = user.profile?.position || '员工';
+    
+    // 构建任务描述
+    const taskDescription = `${task.title}: ${task.description}`;
+    
+    // 调用AI服务生成规划
+    const aiPlans = await aiService.generateTaskPlanning(
+      taskDescription,
+      userPosition,
+      task.dueDate
+    );
+
+    if (!aiPlans || aiPlans.length === 0) {
+      return res.status(500).json({
+        success: false,
+        message: 'AI规划生成失败，请稍后重试'
+      });
+    }
+
+    // 将AI生成的计划转换为适合前端的格式
+    const executionPlans = aiPlans.map(plan => ({
+      planName: plan.title,
+      description: plan.content,
+      estimatedTime: '根据计划而定',
+      resources: ['团队成员', '必要工具'],
+      steps: plan.content.includes('\n-') ? 
+        plan.content.split('\n-').slice(1).map(step => step.trim()) : 
+        ['执行计划中的步骤']
+    }));
+
+    // 更新任务记录中的执行计划
+    task.executionPlans = executionPlans;
+    await task.save();
+
+    // 记录活动日志
+    await task.addActivityLog('ai_planning', req.user.id, `AI生成了${executionPlans.length}个执行计划`);
+
+    res.status(200).json({
+      success: true,
+      message: `成功生成${executionPlans.length}个执行计划`,
+      executionPlans,
+      taskId: task._id,
+      generatedAt: new Date()
+    });
+
+  } catch (error) {
+    console.error('生成任务执行计划失败:', error);
+    res.status(500).json({
+      success: false,
+      message: `生成执行计划失败: ${error.message}`
+    });
+  }
+});
+
 module.exports = {
   getTasks,
   createTask,
@@ -455,5 +538,6 @@ module.exports = {
   updateTask,
   deleteTask,
   getTaskStats,
-  addTaskComment
+  addTaskComment,
+  generateTaskExecutionPlans
 };

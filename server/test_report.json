@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-07-26T06:42:06.316Z",
+  "timestamp": "2025-07-26T07:09:30.893Z",
   "summary": {
     "passed": 19,
     "failed": 9,
@@ -10,47 +10,47 @@
     {
       "category": "任务管理功能测试失败",
       "message": "资源未找到",
-      "timestamp": "2025-07-26T06:42:06.165Z"
+      "timestamp": "2025-07-26T07:09:30.748Z"
     },
     {
       "category": "AI文档分析功能异常",
       "message": "路径 /api/ai/analyze 不存在",
-      "timestamp": "2025-07-26T06:42:06.176Z"
+      "timestamp": "2025-07-26T07:09:30.757Z"
     },
     {
       "category": "会议处理功能测试失败",
       "message": "路径 /api/meetings/undefined 不存在",
-      "timestamp": "2025-07-26T06:42:06.200Z"
+      "timestamp": "2025-07-26T07:09:30.776Z"
     },
     {
       "category": "社交功能测试失败",
       "message": "路径 /api/social/recommend 不存在",
-      "timestamp": "2025-07-26T06:42:06.225Z"
+      "timestamp": "2025-07-26T07:09:30.798Z"
     },
     {
       "category": "增强AI功能测试失败",
       "message": "路径 /api/ai/enhanced/search 不存在",
-      "timestamp": "2025-07-26T06:42:06.229Z"
+      "timestamp": "2025-07-26T07:09:30.802Z"
     },
     {
       "category": "微信webhook测试失败",
       "message": "Request failed with status code 403",
-      "timestamp": "2025-07-26T06:42:06.231Z"
+      "timestamp": "2025-07-26T07:09:30.803Z"
     },
     {
       "category": "端点 /api/ai/analyze 异常",
       "message": "Request failed with status code 404",
-      "timestamp": "2025-07-26T06:42:06.263Z"
+      "timestamp": "2025-07-26T07:09:30.836Z"
     },
     {
       "category": "端点 /api/ai/enhanced/search 异常",
       "message": "Request failed with status code 404",
-      "timestamp": "2025-07-26T06:42:06.266Z"
+      "timestamp": "2025-07-26T07:09:30.839Z"
     },
     {
       "category": "端点 /api/social/profile 异常",
       "message": "Request failed with status code 404",
-      "timestamp": "2025-07-26T06:42:06.267Z"
+      "timestamp": "2025-07-26T07:09:30.840Z"
     }
   ]
 }

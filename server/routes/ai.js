@@ -5,6 +5,7 @@ const {
   testProvider,
   chat,
   generateTaskPlanning,
+  executePlan,
   analyzeDocument,
   analyzeMeeting,
   batchProcess
@@ -19,6 +20,7 @@ router.use(protect);
 // 用户可用的AI功能
 router.post('/chat', chat);
 router.post('/task-planning', generateTaskPlanning);
+router.post('/execute-plan', executePlan);
 router.post('/document-analysis', analyzeDocument);
 router.post('/meeting-analysis', analyzeMeeting);
 

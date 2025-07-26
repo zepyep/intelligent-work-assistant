@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Card,
@@ -30,22 +30,18 @@ import {
 import CustomGrid from '../../components/common/CustomGrid';
 const Grid = CustomGrid;
 import {
-  Chat,
   QrCode,
   Link,
   LinkOff,
   Refresh,
-  Settings,
   Send,
   Message,
   Person,
   AccessTime,
   CheckCircle,
-  Warning,
   SmartToy,
   ExpandMore,
   ContentCopy,
-  Sync,
 } from '@mui/icons-material';
 import { useAuth } from '../../hooks/useAuth';
 import { useApi } from '../../contexts/ApiContext';
@@ -88,19 +84,7 @@ const WeChat: React.FC = () => {
   const [testMessage, setTestMessage] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    loadWeChatData();
-    // Auto refresh binding status every 10 seconds when binding code is active
-    const interval = setInterval(() => {
-      if (bindingCode?.isActive) {
-        checkBindingStatus();
-      }
-    }, 10000);
-    
-    return () => clearInterval(interval);
-  }, [bindingCode?.isActive]);
-
-  const loadWeChatData = async () => {
+  const loadWeChatData = useCallback(async () => {
     setLoading(true);
     try {
       // Load WeChat binding status
@@ -125,7 +109,7 @@ const WeChat: React.FC = () => {
         });
         setMessageLogs([
           {
-            _id: '1',
+            _id: '67762a1b8c9d4e5f6789abd1',
             type: 'received',
             content: '帮我查看今天的任务',
             messageType: 'text',
@@ -134,7 +118,7 @@ const WeChat: React.FC = () => {
             response: '您今天有3个待处理任务：\n1. 完成项目需求分析\n2. 准备周例会材料\n3. 客户需求沟通\n\n详情请访问任务管理页面查看。'
           },
           {
-            _id: '2',
+            _id: '67762a2c8c9d4e5f6789abd2',
             type: 'received',
             content: '上传会议录音文件',
             messageType: 'voice',
@@ -143,7 +127,7 @@ const WeChat: React.FC = () => {
             response: '会议录音已成功上传并处理，生成了以下行动项：\n1. 完成UI设计稿最终版本（负责人：李四）\n2. 准备产品演示PPT（负责人：王五）\n\n详情请查看会议管理页面。'
           },
           {
-            _id: '3',
+            _id: '67762a3d8c9d4e5f6789abd3',
             type: 'received',
             content: '明天的日程安排',
             messageType: 'text',
@@ -155,7 +139,36 @@ const WeChat: React.FC = () => {
       }
     }
     setLoading(false);
-  };
+  }, [api, user?.wechatBinding?.isVerified]);
+
+  const checkBindingStatus = useCallback(async () => {
+    if (!bindingCode?.code) return;
+    
+    try {
+      const response = await api.get(`/wechat/binding/check/${bindingCode.code}`);
+      if (response.data.success && response.data.bound) {
+        setWeChatBinding(response.data.binding);
+        setBindingCode(null);
+        setQrCodeOpen(false);
+        alert('微信账号绑定成功！');
+        await loadWeChatData();
+      }
+    } catch (error) {
+      console.error('Failed to check binding status:', error);
+    }
+  }, [bindingCode?.code, api, loadWeChatData]);
+
+  useEffect(() => {
+    loadWeChatData();
+    // Auto refresh binding status every 10 seconds when binding code is active
+    const interval = setInterval(() => {
+      if (bindingCode?.isActive) {
+        checkBindingStatus();
+      }
+    }, 10000);
+    
+    return () => clearInterval(interval);
+  }, [loadWeChatData, bindingCode?.isActive, checkBindingStatus]);
 
   const generateBindingCode = async () => {
     setBingingLoading(true);
@@ -183,22 +196,7 @@ const WeChat: React.FC = () => {
     setBingingLoading(false);
   };
 
-  const checkBindingStatus = async () => {
-    if (!bindingCode?.code) return;
-    
-    try {
-      const response = await api.get(`/wechat/binding/check/${bindingCode.code}`);
-      if (response.data.success && response.data.bound) {
-        setWeChatBinding(response.data.binding);
-        setBindingCode(null);
-        setQrCodeOpen(false);
-        alert('微信账号绑定成功！');
-        await loadWeChatData();
-      }
-    } catch (error) {
-      console.error('Failed to check binding status:', error);
-    }
-  };
+
 
   const handleUnbind = async () => {
     if (!window.confirm('确定要解除微信绑定吗？解除后将无法通过微信使用智能助手功能。')) {

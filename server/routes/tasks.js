@@ -8,7 +8,8 @@ const {
   updateTask,
   deleteTask,
   getTaskStats,
-  addTaskComment
+  addTaskComment,
+  generateTaskExecutionPlans
 } = require('../controllers/taskController');
 const { protect } = require('../middleware/auth');
 
@@ -553,5 +554,42 @@ router.route('/:id')
  */
 // 任务评论
 router.post('/:id/comments', addTaskComment);
+
+/**
+ * @swagger
+ * /api/tasks/{id}/generate-plans:
+ *   post:
+ *     summary: 为任务生成AI执行计划
+ *     tags: [Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 任务ID
+ *     responses:
+ *       200:
+ *         description: 成功生成执行计划
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 executionPlans:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ */
+// 生成AI执行计划
+router.post('/:id/generate-plans', generateTaskExecutionPlans);
 
 module.exports = router;

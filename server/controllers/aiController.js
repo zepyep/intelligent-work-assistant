@@ -278,6 +278,54 @@ const analyzeMeeting = asyncHandler(async (req, res) => {
 });
 
 /**
+ * 任务计划执行接口
+ * @route   POST /api/ai/execute-plan
+ * @access  Private
+ */
+const executePlan = asyncHandler(async (req, res) => {
+  const { taskId, planIndex, customRequirements, provider } = req.body;
+
+  if (!taskId || typeof planIndex !== 'number') {
+    return res.status(400).json({
+      success: false,
+      message: '请提供有效的任务ID和计划索引'
+    });
+  }
+
+  const options = provider ? { provider } : {};
+  const userPosition = req.user.profile?.position || '员工';
+
+  try {
+    // 模拟任务执行 - 在实际应用中，这里会调用真实的AI服务
+    const executionResults = await aiService.executePlan(
+      taskId,
+      planIndex,
+      userPosition,
+      customRequirements,
+      options
+    );
+
+    res.status(200).json({
+      success: true,
+      message: '任务计划执行完成',
+      data: {
+        executionResults,
+        taskId,
+        planIndex,
+        provider: provider || aiService.defaultProvider,
+        executedAt: new Date()
+      }
+    });
+  } catch (error) {
+    console.error('任务计划执行失败:', error);
+    res.status(500).json({
+      success: false,
+      message: `任务计划执行失败: ${error.message}`
+    });
+  }
+});
+
+/**
  * 批量AI处理接口
  * @route   POST /api/ai/batch
  * @access  Private (Admin)
@@ -353,6 +401,7 @@ module.exports = {
   testProvider,
   chat,
   generateTaskPlanning,
+  executePlan,
   analyzeDocument,
   analyzeMeeting,
   batchProcess

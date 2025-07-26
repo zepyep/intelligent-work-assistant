@@ -9,6 +9,7 @@ const cookieParser = require('cookie-parser');
 const connectDB = require('./config/database');
 const swaggerConfig = require('./config/swagger');
 const securityConfig = require('./config/security');
+const corsConfig = require('./config/cors');
 const errorHandler = require('./middleware/errorHandler');
 const { applySecurityMiddleware, rateLimits } = require('./middleware/securityMiddleware');
 const { auditLogger } = require('./middleware/accessControl');
@@ -55,8 +56,8 @@ app.use(helmet({
   referrerPolicy: { policy: 'same-origin' }
 }));
 
-// CORS configuration
-app.use(cors(securityConfig.cors));
+// CORS configuration - 支持 Clacky 环境
+app.use(cors(corsConfig));
 
 // Audit logging for security monitoring
 if (process.env.NODE_ENV !== 'test') {

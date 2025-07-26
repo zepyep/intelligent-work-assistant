@@ -341,7 +341,7 @@ const CollaborationRequests: React.FC = () => {
   // Mock data for demonstration
   const mockReceivedRequests: CollaborationRequest[] = [
     {
-      _id: '1',
+      _id: '67762a1b8c9d4e5f6789abe1',
       sender: {
         _id: 'user1',
         profile: {
@@ -366,7 +366,7 @@ const CollaborationRequests: React.FC = () => {
 
   const mockSentRequests: CollaborationRequest[] = [
     {
-      _id: '2',
+      _id: '67762a2c8c9d4e5f6789abe2',
       sender: {
         _id: 'currentUser',
         profile: { fullName: '当前用户', position: '', company: '' }

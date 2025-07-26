@@ -20,6 +20,15 @@ const connectDB = async () => {
     console.log(`📦 MongoDB连接成功: ${conn.connection.host}`);
     console.log(`🗄️  数据库名称: ${conn.connection.name}`);
 
+    // 初始化智能搜索索引（在数据库连接成功后）
+    try {
+      const IntelligentSearchService = require('../services/intelligentSearchService');
+      const searchService = new IntelligentSearchService();
+      await searchService.initializeSearchIndex();
+    } catch (error) {
+      console.log('⚠️  智能搜索索引初始化跳过:', error.message);
+    }
+
     // 连接事件监听
     mongoose.connection.on('connected', () => {
       console.log('MongoDB 连接已建立');

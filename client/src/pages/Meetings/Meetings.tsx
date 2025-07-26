@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   Card,
@@ -126,21 +126,17 @@ const Meetings: React.FC = () => {
     attendees: '',
   });
 
-  useEffect(() => {
-    loadMeetings();
-  }, []);
-
-  const loadMeetings = async () => {
+  const loadMeetings = useCallback(async () => {
     setLoading(true);
     try {
       const response = await api.get('/meetings');
-      setMeetings(response.data);
+      setMeetings(response.data || []);
     } catch (error) {
       console.error('Failed to load meetings:', error);
       // Mock data for demo
       setMeetings([
         {
-          _id: '1',
+          _id: '67762c1a8c9d4e5f6789abd1',
           title: '团队周例会',
           description: '讨论本周工作进展和下周计划',
           date: '2024-12-23',
@@ -177,23 +173,23 @@ const Meetings: React.FC = () => {
             {
               content: '完成UI设计稿的最终版本',
               assignee: '李四',
-              priority: 'high',
+              priority: 'high' as const,
               dueDate: '2024-12-24',
-              status: 'in_progress'
+              status: 'in_progress' as const
             },
             {
               content: '准备产品演示PPT',
               assignee: '王五',
-              priority: 'medium',
+              priority: 'medium' as const,
               dueDate: '2024-12-25',
-              status: 'pending'
+              status: 'pending' as const
             },
             {
               content: '安排客户演示时间',
               assignee: '张三',
-              priority: 'high',
+              priority: 'high' as const,
               dueDate: '2024-12-24',
-              status: 'completed'
+              status: 'completed' as const
             }
           ],
           summary: '本次会议主要讨论了产品开发进展，UI设计即将完成，需要准备客户演示相关工作。团队整体进度良好，按计划推进。',
@@ -207,7 +203,7 @@ const Meetings: React.FC = () => {
           createdAt: '2024-12-23T10:00:00Z'
         },
         {
-          _id: '2',
+          _id: '67762c2b8c9d4e5f6789abd2',
           title: '客户需求讨论',
           description: '与客户A讨论新功能需求',
           date: '2024-12-22',
@@ -229,7 +225,13 @@ const Meetings: React.FC = () => {
       ]);
     }
     setLoading(false);
-  };
+  }, [api, user?.username]);
+
+  useEffect(() => {
+    loadMeetings();
+  }, [loadMeetings]);
+
+
 
   const handleAudioUpload = async (files: FileList, meetingId?: string) => {
     if (!files.length) return;
@@ -267,7 +269,7 @@ const Meetings: React.FC = () => {
   const handleProcessAudio = async (meetingId: string) => {
     setProcessingId(meetingId);
     try {
-      const response = await api.post(`/meetings/${meetingId}/process`);
+      const response = await api.post(`/meetings/${meetingId}/reanalyze`);
       if (response.data.success) {
         await loadMeetings();
         alert('音频处理完成');
@@ -329,7 +331,7 @@ const Meetings: React.FC = () => {
       console.error('Failed to create meeting:', error);
       // For demo, add meeting locally
       const newMeeting: Meeting = {
-        _id: Date.now().toString(),
+        _id: new Date().getTime().toString(16) + Math.random().toString(16).substr(2, 8),
         ...formData,
         attendees: formData.attendees.split(',').map(a => a.trim()).filter(a => a),
         duration: 0,
@@ -398,7 +400,7 @@ const Meetings: React.FC = () => {
     }
   };
 
-  const filteredMeetings = meetings.filter(meeting => {
+  const filteredMeetings = (meetings || []).filter(meeting => {
     const matchesSearch = meeting.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          meeting.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesTab = activeTab === 0 || 
@@ -466,7 +468,7 @@ const Meetings: React.FC = () => {
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <VideoCall sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
-              <Typography variant="h4">{meetings.length}</Typography>
+              <Typography variant="h4">{meetings?.length || 0}</Typography>
               <Typography variant="body2" color="text.secondary">
                 总会议数
               </Typography>
@@ -478,7 +480,7 @@ const Meetings: React.FC = () => {
             <CardContent sx={{ textAlign: 'center' }}>
               <Transcribe sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
               <Typography variant="h4">
-                {meetings.filter(m => m.transcript?.isProcessed).length}
+                {(meetings || []).filter(m => m.transcript?.isProcessed).length}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 已转录
@@ -491,7 +493,7 @@ const Meetings: React.FC = () => {
             <CardContent sx={{ textAlign: 'center' }}>
               <Assignment sx={{ fontSize: 40, color: 'info.main', mb: 1 }} />
               <Typography variant="h4">
-                {meetings.reduce((sum, m) => sum + m.actionItems.length, 0)}
+                {(meetings || []).reduce((sum, m) => sum + (m.actionItems?.length || 0), 0)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 行动项总数
@@ -504,7 +506,7 @@ const Meetings: React.FC = () => {
             <CardContent sx={{ textAlign: 'center' }}>
               <Psychology sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
               <Typography variant="h4">
-                {meetings.filter(m => m.audioFile && !m.transcript?.isProcessed).length}
+                {(meetings || []).filter(m => m.audioFile && !m.transcript?.isProcessed).length}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 待处理音频
@@ -536,9 +538,9 @@ const Meetings: React.FC = () => {
                 indicatorColor="primary"
                 textColor="primary"
               >
-                <Tab label={`全部 (${meetings.length})`} />
-                <Tab label={`已转录 (${meetings.filter(m => m.transcript?.isProcessed).length})`} />
-                <Tab label={`待转录 (${meetings.filter(m => !m.transcript?.isProcessed).length})`} />
+                <Tab label={`全部 (${meetings?.length || 0})`} />
+                <Tab label={`已转录 (${(meetings || []).filter(m => m.transcript?.isProcessed).length})`} />
+                <Tab label={`待转录 (${(meetings || []).filter(m => !m.transcript?.isProcessed).length})`} />
               </Tabs>
             </Grid>
           </Grid>

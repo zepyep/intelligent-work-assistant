@@ -271,7 +271,7 @@ export const meetingsApi = {
   },
 
   async processAudio(id: string) {
-    const response = await apiClient.post(`/meetings/${id}/process`);
+    const response = await apiClient.post(`/meetings/${id}/reanalyze`);
     return response;
   },
 

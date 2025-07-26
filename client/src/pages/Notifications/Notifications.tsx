@@ -101,10 +101,14 @@ const Notifications: React.FC = () => {
     try {
       setLoading(true);
       const response = await api.get('/notifications');
-      setNotifications(response.data);
+      // Ensure response.data is always an array
+      const notificationData = Array.isArray(response.data) ? response.data : [];
+      setNotifications(notificationData);
     } catch (error: any) {
       setError(error.response?.data?.message || '获取通知失败');
       console.error('获取通知失败:', error);
+      // Set empty array on error to prevent undefined access
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -123,7 +127,9 @@ const Notifications: React.FC = () => {
       }
 
       const response = await api.post('/notifications', newNotification);
-      setNotifications([response.data, ...notifications]);
+      // Ensure notifications is always an array before spreading
+      const currentNotifications = Array.isArray(notifications) ? notifications : [];
+      setNotifications([response.data, ...currentNotifications]);
       setCreateDialogOpen(false);
       setNewNotification({
         title: '',
@@ -144,7 +150,9 @@ const Notifications: React.FC = () => {
 
     try {
       await api.delete(`/notifications/${notificationId}`);
-      setNotifications(notifications.filter(n => n._id !== notificationId));
+      // Ensure notifications is always an array before filtering
+      const currentNotifications = Array.isArray(notifications) ? notifications : [];
+      setNotifications(currentNotifications.filter(n => n._id !== notificationId));
     } catch (error: any) {
       setError(error.response?.data?.message || '删除通知失败');
       console.error('删除通知失败:', error);
@@ -154,7 +162,9 @@ const Notifications: React.FC = () => {
   const handleMarkAsRead = async (notificationId: string) => {
     try {
       await api.patch(`/notifications/${notificationId}/read`);
-      setNotifications(notifications.map(n => 
+      // Ensure notifications is always an array before mapping
+      const currentNotifications = Array.isArray(notifications) ? notifications : [];
+      setNotifications(currentNotifications.map(n => 
         n._id === notificationId 
           ? { ...n, readAt: new Date().toISOString() }
           : n
@@ -174,21 +184,34 @@ const Notifications: React.FC = () => {
   };
 
   const getFilteredNotifications = () => {
+    if (!notifications || !Array.isArray(notifications)) {
+      return [];
+    }
+    
     switch (activeTab) {
       case 0: // 全部
         return notifications;
       case 1: // 未读
-        return notifications.filter(n => !n.readAt);
+        return (notifications || []).filter(n => !n.readAt);
       case 2: // 待发送
-        return notifications.filter(n => n.status === 'pending');
+        return (notifications || []).filter(n => n.status === 'pending');
       case 3: // 失败
-        return notifications.filter(n => n.status === 'failed');
+        return (notifications || []).filter(n => n.status === 'failed');
       default:
         return notifications;
     }
   };
 
   const getTabCounts = () => {
+    if (!notifications || !Array.isArray(notifications)) {
+      return {
+        all: 0,
+        unread: 0,
+        pending: 0,
+        failed: 0
+      };
+    }
+    
     return {
       all: notifications.length,
       unread: notifications.filter(n => !n.readAt).length,

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能工作助手 - 自动登录</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .user-info {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            text-align: left;
+        }
+        
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            text-decoration: none;
+            display: inline-block;
+            transition: background 0.3s;
+        }
+        
+        .btn:hover {
+            background: #5a67d8;
+        }
+        
+        .btn-success {
+            background: #48bb78;
+        }
+        
+        .btn-success:hover {
+            background: #38a169;
+        }
+        
+        .status-success {
+            color: #48bb78;
+            font-weight: bold;
+        }
+        
+        .status-error {
+            color: #e53e3e;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 智能工作助手</h1>
+        
+        <div id="loadingSection" class="loading">
+            <div class="spinner"></div>
+            <p>正在自动登录...</p>
+        </div>
+        
+        <div id="loginResult" style="display: none;">
+            <div id="userInfo" class="user-info"></div>
+            <div id="actions"></div>
+        </div>
+        
+        <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #e2e8f0;">
+            <h3>📋 可用功能</h3>
+            <div style="text-align: left; margin: 1rem 0;">
+                <p><strong>✅ 任务管理</strong> - 智能任务规划和进度跟踪</p>
+                <p><strong>✅ 文档分析</strong> - AI驱动的文档解析和摘要</p>
+                <p><strong>✅ 会议助手</strong> - 音频转文字和行动清单生成</p>
+                <p><strong>✅ 日程同步</strong> - 多平台日程管理</p>
+                <p><strong>✅ 社交档案</strong> - 智能推荐和用户匹配</p>
+                <p><strong>✅ 微信集成</strong> - 公众号智能助手</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 自动登录配置
+        const API_BASE = 'http://localhost:5000';
+        const ADMIN_CREDENTIALS = {
+            email: 'admin@example.com',
+            password: 'admin123'
+        };
+
+        // 自动登录函数
+        async function autoLogin() {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(ADMIN_CREDENTIALS)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // 保存token到localStorage
+                    localStorage.setItem('token', data.data.token);
+                    localStorage.setItem('user', JSON.stringify(data.data.user));
+                    
+                    // 显示登录成功信息
+                    showLoginSuccess(data.data);
+                } else {
+                    showLoginError(data.message || '登录失败');
+                }
+            } catch (error) {
+                console.error('登录错误:', error);
+                showLoginError('网络连接失败，请确保后端服务正在运行');
+            }
+        }
+
+        // 显示登录成功
+        function showLoginSuccess(data) {
+            document.getElementById('loadingSection').style.display = 'none';
+            document.getElementById('loginResult').style.display = 'block';
+            
+            const userInfo = document.getElementById('userInfo');
+            userInfo.innerHTML = `
+                <h3 class="status-success">✅ 登录成功！</h3>
+                <p><strong>用户名:</strong> ${data.user.username}</p>
+                <p><strong>邮箱:</strong> ${data.user.email}</p>
+                <p><strong>角色:</strong> ${data.user.role}</p>
+                <p><strong>姓名:</strong> ${data.user.profile.fullName}</p>
+                <p><strong>职位:</strong> ${data.user.profile.position}</p>
+                <p><strong>登录次数:</strong> ${data.user.loginCount}</p>
+                <p><strong>Token:</strong> <code style="font-size: 12px; word-break: break-all;">${data.token}</code></p>
+            `;
+            
+            const actions = document.getElementById('actions');
+            actions.innerHTML = `
+                <a href="http://localhost:3000" class="btn btn-success" target="_blank">
+                    🎯 进入主应用界面
+                </a>
+                <a href="http://localhost:5000/api-docs" class="btn" target="_blank">
+                    📚 查看API文档
+                </a>
+                <button class="btn" onclick="testAPI()">
+                    🧪 测试API功能
+                </button>
+                <button class="btn" onclick="showDashboard()">
+                    📊 显示仪表板数据
+                </button>
+            `;
+        }
+
+        // 显示登录错误
+        function showLoginError(message) {
+            document.getElementById('loadingSection').style.display = 'none';
+            document.getElementById('loginResult').style.display = 'block';
+            
+            const userInfo = document.getElementById('userInfo');
+            userInfo.innerHTML = `
+                <h3 class="status-error">❌ 登录失败</h3>
+                <p>${message}</p>
+                <p><strong>请确保:</strong></p>
+                <ul style="text-align: left;">
+                    <li>后端服务正在运行 (http://localhost:5000)</li>
+                    <li>数据库连接正常</li>
+                    <li>管理员账号存在</li>
+                </ul>
+            `;
+            
+            const actions = document.getElementById('actions');
+            actions.innerHTML = `
+                <button class="btn" onclick="autoLogin()">
+                    🔄 重新尝试登录
+                </button>
+                <a href="http://localhost:5000/health" class="btn" target="_blank">
+                    🔍 检查服务状态
+                </a>
+            `;
+        }
+
+        // 测试API功能
+        async function testAPI() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('请先登录');
+                return;
+            }
+
+            try {
+                // 测试任务创建
+                const taskResponse = await fetch(`${API_BASE}/api/tasks`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        title: '测试任务',
+                        description: '这是一个通过自动登录页面创建的测试任务',
+                        priority: 'medium',
+                        deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+                    })
+                });
+
+                const taskData = await taskResponse.json();
+                
+                if (taskData.success) {
+                    alert('✅ API测试成功！已创建测试任务: ' + taskData.data.task.title);
+                } else {
+                    alert('❌ API测试失败: ' + taskData.message);
+                }
+            } catch (error) {
+                alert('❌ API测试失败: ' + error.message);
+            }
+        }
+
+        // 显示仪表板数据
+        async function showDashboard() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('请先登录');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/users/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    const dashboardInfo = `
+📊 用户仪表板
+━━━━━━━━━━━━━━━
+👤 用户信息: ${data.data.user.profile.fullName}
+📧 邮箱: ${data.data.user.email}
+🎯 角色: ${data.data.user.role}
+🔢 登录次数: ${data.data.user.loginCount}
+📅 注册时间: ${new Date(data.data.user.createdAt).toLocaleString()}
+📝 账号状态: ${data.data.user.isActive ? '活跃' : '已禁用'}
+✉️ 邮箱验证: ${data.data.user.isEmailVerified ? '已验证' : '未验证'}
+━━━━━━━━━━━━━━━
+🌍 语言: ${data.data.user.settings.language}
+🌏 时区: ${data.data.user.settings.timezone}
+🎨 主题: ${data.data.user.settings.theme}
+                    `;
+                    alert(dashboardInfo);
+                } else {
+                    alert('❌ 获取仪表板数据失败: ' + data.message);
+                }
+            } catch (error) {
+                alert('❌ 获取仪表板数据失败: ' + error.message);
+            }
+        }
+
+        // 页面加载时自动登录
+        window.onload = function() {
+            // 检查是否已经有token
+            const existingToken = localStorage.getItem('token');
+            const existingUser = localStorage.getItem('user');
+            
+            if (existingToken && existingUser) {
+                // 如果已有token，直接显示用户信息
+                try {
+                    const userData = JSON.parse(existingUser);
+                    showLoginSuccess({
+                        token: existingToken,
+                        user: userData
+                    });
+                    return;
+                } catch (e) {
+                    // token无效，清除并重新登录
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                }
+            }
+            
+            // 自动登录
+            setTimeout(autoLogin, 1000); // 1秒后开始登录
+        };
+    </script>
+</body>
+</html>

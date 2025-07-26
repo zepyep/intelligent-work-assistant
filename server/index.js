@@ -17,8 +17,10 @@ const meetingRoutes = require('./routes/meetings');
 const calendarRoutes = require('./routes/calendar');
 const wechatRoutes = require('./routes/wechat');
 const wechatAdminRoutes = require('./routes/wechat-admin');
+const wechatConfigRoutes = require('./routes/wechat-config');
 const aiRoutes = require('./routes/ai');
 const notificationRoutes = require('./routes/notification');
+const socialRoutes = require('./routes/social');
 
 const app = express();
 
@@ -29,10 +31,8 @@ connectDB();
 app.use(helmet());
 
 // 跨域配置
-app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
-  credentials: true
-}));
+const corsConfig = require('./config/cors');
+app.use(cors(corsConfig));
 
 // 速率限制
 const limiter = rateLimit({
@@ -77,8 +77,10 @@ app.use('/api/meetings', meetingRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/wechat', wechatRoutes);
 app.use('/api/wechat-admin', wechatAdminRoutes);
+app.use('/api/wechat-config', wechatConfigRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/social', socialRoutes);
 
 // 微信公众号 webhook（需要在根路径）
 app.use('/wechat', require('./routes/wechat-webhook'));

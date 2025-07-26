@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   Card,
@@ -19,10 +19,7 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemAvatar,
-  ListItemSecondaryAction,
   Avatar,
-  Divider,
   Alert,
   LinearProgress,
   Paper,
@@ -79,14 +76,7 @@ interface Document {
   uploadedBy: string;
 }
 
-interface AnalysisResult {
-  summary: string;
-  keyPoints: string[];
-  category: string;
-  sentiment: 'positive' | 'neutral' | 'negative';
-  entities: string[];
-  recommendations: string[];
-}
+// Removed unused AnalysisResult interface
 
 const Documents: React.FC = () => {
   const { user } = useAuth();
@@ -102,21 +92,17 @@ const Documents: React.FC = () => {
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  useEffect(() => {
-    loadDocuments();
-  }, []);
-
-  const loadDocuments = async () => {
+  const loadDocuments = useCallback(async () => {
     setLoading(true);
     try {
       const response = await api.get('/documents');
-      setDocuments(response.data);
+      setDocuments(response.data || []);
     } catch (error) {
       console.error('Failed to load documents:', error);
       // Mock data for demo
       setDocuments([
         {
-          _id: '1',
+          _id: '67762b1a8c9d4e5f6789abc1',
           filename: 'project-requirements.pdf',
           originalName: '项目需求文档.pdf',
           fileType: 'pdf',
@@ -133,7 +119,7 @@ const Documents: React.FC = () => {
               '要求支持多平台日程同步'
             ],
             category: '需求文档',
-            sentiment: 'positive',
+            sentiment: 'positive' as const,
             entities: ['任务管理', '文档分析', '会议处理', '微信集成', '日程同步'],
             analyzedAt: '2024-12-20T10:30:00Z'
           },
@@ -142,7 +128,7 @@ const Documents: React.FC = () => {
           uploadedBy: user?.username || '张三',
         },
         {
-          _id: '2',
+          _id: '67762b2b8c9d4e5f6789abc2',
           filename: 'market-research.docx',
           originalName: '市场调研报告.docx',
           fileType: 'docx',
@@ -159,7 +145,7 @@ const Documents: React.FC = () => {
               '个人用户市场仍有很大空间'
             ],
             category: '市场调研',
-            sentiment: 'positive',
+            sentiment: 'positive' as const,
             entities: ['市场调研', '用户需求', '竞争分析'],
             analyzedAt: '2024-12-19T15:00:00Z'
           },
@@ -167,7 +153,7 @@ const Documents: React.FC = () => {
           uploadedBy: user?.username || '李四',
         },
         {
-          _id: '3',
+          _id: '67762b3c8c9d4e5f6789abc3',
           filename: 'technical-spec.md',
           originalName: '技术规格说明.md',
           fileType: 'md',
@@ -180,7 +166,13 @@ const Documents: React.FC = () => {
       ]);
     }
     setLoading(false);
-  };
+  }, [api, user?.username]);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
+
+
 
   const handleFileUpload = async (files: FileList) => {
     if (!files.length) return;
@@ -206,7 +198,7 @@ const Documents: React.FC = () => {
       // For demo, simulate upload
       Array.from(files).forEach((file, index) => {
         const newDoc: Document = {
-          _id: `${Date.now()}-${index}`,
+          _id: new Date().getTime().toString(16) + Math.random().toString(16).substr(2, 8),
           filename: `${Date.now()}-${file.name}`,
           originalName: file.name,
           fileType: file.name.split('.').pop() || 'unknown',
@@ -216,7 +208,7 @@ const Documents: React.FC = () => {
           tags: [],
           uploadedBy: user?.username || 'unknown',
         };
-        setDocuments(prev => [newDoc, ...prev]);
+        setDocuments(prev => [newDoc, ...(prev || [])]);
       });
       alert(`成功上传 ${files.length} 个文档（演示模式）`);
     }
@@ -228,7 +220,7 @@ const Documents: React.FC = () => {
     try {
       const response = await api.post(`/documents/${docId}/analyze`);
       if (response.data.success) {
-        setDocuments(prev => prev.map(doc => 
+        setDocuments(prev => (prev || []).map(doc => 
           doc._id === docId 
             ? { ...doc, analysis: response.data.analysis }
             : doc
@@ -252,7 +244,7 @@ const Documents: React.FC = () => {
         analyzedAt: new Date().toISOString()
       };
       
-      setDocuments(prev => prev.map(doc => 
+      setDocuments(prev => (prev || []).map(doc => 
         doc._id === docId 
           ? { ...doc, analysis: mockAnalysis }
           : doc
@@ -285,12 +277,12 @@ const Documents: React.FC = () => {
 
     try {
       await api.delete(`/documents/${docId}`);
-      setDocuments(prev => prev.filter(doc => doc._id !== docId));
+      setDocuments(prev => (prev || []).filter(doc => doc._id !== docId));
       alert('文档删除成功');
     } catch (error) {
       console.error('Failed to delete document:', error);
       // For demo, remove locally
-      setDocuments(prev => prev.filter(doc => doc._id !== docId));
+      setDocuments(prev => (prev || []).filter(doc => doc._id !== docId));
       alert('文档删除成功（演示模式）');
     }
   };
@@ -335,9 +327,9 @@ const Documents: React.FC = () => {
     }
   };
 
-  const filteredDocuments = documents.filter(doc => {
+  const filteredDocuments = (documents || []).filter(doc => {
     const matchesSearch = doc.originalName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         doc.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+                         (doc.tags || []).some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesCategory = !filterCategory || doc.analysis?.category === filterCategory;
     const matchesTab = activeTab === 0 || 
                       (activeTab === 1 && doc.analysis?.isAnalyzed) ||
@@ -346,7 +338,7 @@ const Documents: React.FC = () => {
   });
 
   const categories = Array.from(new Set(
-    documents
+    (documents || [])
       .filter(doc => doc.analysis?.category)
       .map(doc => doc.analysis!.category)
   ));
@@ -404,7 +396,7 @@ const Documents: React.FC = () => {
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Description sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
-              <Typography variant="h4">{documents.length}</Typography>
+              <Typography variant="h4">{documents?.length || 0}</Typography>
               <Typography variant="body2" color="text.secondary">
                 总文档数
               </Typography>
@@ -416,7 +408,7 @@ const Documents: React.FC = () => {
             <CardContent sx={{ textAlign: 'center' }}>
               <Analytics sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
               <Typography variant="h4">
-                {documents.filter(doc => doc.analysis?.isAnalyzed).length}
+                {(documents || []).filter(doc => doc.analysis?.isAnalyzed).length}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 已分析文档
@@ -429,7 +421,7 @@ const Documents: React.FC = () => {
             <CardContent sx={{ textAlign: 'center' }}>
               <CloudUpload sx={{ fontSize: 40, color: 'info.main', mb: 1 }} />
               <Typography variant="h4">
-                {documents.filter(doc => new Date(doc.uploadDate) > new Date(Date.now() - 7*24*60*60*1000)).length}
+                {(documents || []).filter(doc => new Date(doc.uploadDate) > new Date(Date.now() - 7*24*60*60*1000)).length}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 本周上传
@@ -488,9 +480,9 @@ const Documents: React.FC = () => {
                 indicatorColor="primary"
                 textColor="primary"
               >
-                <Tab label={`全部 (${documents.length})`} />
-                <Tab label={`已分析 (${documents.filter(doc => doc.analysis?.isAnalyzed).length})`} />
-                <Tab label={`待分析 (${documents.filter(doc => !doc.analysis?.isAnalyzed).length})`} />
+                <Tab label={`全部 (${(documents || []).length})`} />
+                <Tab label={`已分析 (${(documents || []).filter(doc => doc.analysis?.isAnalyzed).length})`} />
+                <Tab label={`待分析 (${(documents || []).filter(doc => !doc.analysis?.isAnalyzed).length})`} />
               </Tabs>
             </Grid>
           </Grid>
@@ -522,7 +514,7 @@ const Documents: React.FC = () => {
                       </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                      {doc.tags.map(tag => (
+                      {(doc.tags || []).map(tag => (
                         <Chip key={tag} label={tag} size="small" color="secondary" />
                       ))}
                     </Box>

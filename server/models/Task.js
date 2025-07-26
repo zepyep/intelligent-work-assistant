@@ -88,6 +88,19 @@ const TaskSchema = new mongoose.Schema({
     ref: 'aiPlans.planId'
   },
   
+  // 执行计划（为前端兼容）
+  executionPlans: [{
+    planName: String,
+    description: String,
+    estimatedTime: String,
+    resources: [String],
+    steps: [String],
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  
   // 标签
   tags: [String],
   

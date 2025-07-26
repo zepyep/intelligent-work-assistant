@@ -8,6 +8,15 @@ const UserProfile = require('../models/UserProfile');
 const resumeAnalysisService = require('../services/resumeAnalysisService');
 const userRecommendationService = require('../services/userRecommendationService');
 
+// Helper function to convert availability object to string for frontend
+const getAvailabilityString = (availability) => {
+  if (!availability || !availability.hoursPerWeek) return 'part-time';
+  const hours = availability.hoursPerWeek;
+  if (hours >= 35) return 'full-time';
+  if (hours >= 15) return 'part-time';
+  return 'freelance';
+};
+
 /**
  * 获取用户社交档案
  * @route GET /api/social/profile
@@ -49,13 +58,66 @@ const getUserProfile = asyncHandler(async (req, res) => {
     await profile.populate('user', 'username email profile');
   }
   
+  // Transform data structure to match frontend expectations
+  const transformedData = {
+    profile: {
+      // Map nested personalInfo fields to top level
+      fullName: profile.profile?.personalInfo?.fullName || '',
+      position: profile.profile?.workExperience?.[0]?.position || '',
+      location: profile.profile?.personalInfo?.location?.city || '',
+      bio: profile.profile?.bio || '',
+      company: profile.profile?.workExperience?.[0]?.company || '',
+      industry: profile.aiTags?.industries?.[0] || '',
+      experience: profile.profile?.workExperience?.length || 0,
+      skills: profile.profile?.skills?.technical || [],
+      workExperience: profile.profile?.workExperience || [],
+      education: profile.profile?.education || [],
+      // Contact info from nested structure
+      email: profile.profile?.contact?.email || '',
+      phone: profile.profile?.contact?.phoneNumber || '',
+      linkedin: profile.profile?.contact?.linkedIn || '',
+      github: profile.profile?.contact?.github || '',
+      website: profile.profile?.contact?.website || '',
+    },
+    socialSettings: profile.socialSettings || {
+      isPublic: true,
+      acceptCollaborations: true,
+      showContactInfo: false,
+      privacy: {
+        showExperience: true,
+        showEducation: true,
+        showContact: false,
+      }
+    },
+    collaborationPreferences: profile.collaborationPreferences || {
+      projectTypes: [],
+      availability: {
+        timezone: 'Asia/Shanghai',
+        workingHours: { start: '09:00', end: '18:00' },
+        weekdays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+        hoursPerWeek: 20
+      },
+      workingStyle: {
+        remote: true,
+        inPerson: false,
+        flexible: true
+      },
+      communicationPrefs: {
+        languages: ['zh'],
+        channels: ['wechat', 'email'],
+        responseTime: '24h'
+      }
+    },
+    stats: {
+      connectionCount: 0,
+      collaborationCount: 0,
+    }
+  };
+  
   res.status(200).json({
     success: true,
     message: '获取用户档案成功',
-    data: {
-      profile,
-      completeness: profile.completeness
-    }
+    data: transformedData
   });
 });
 
@@ -73,31 +135,182 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     profile = new UserProfile({ user: req.user.id });
   }
   
-  // 更新档案信息
+  // Initialize profile structure if it doesn't exist
+  if (!profile.profile) {
+    profile.profile = {
+      personalInfo: {},
+      contact: {},
+      skills: { technical: [], soft: [], languages: [], tools: [] },
+      workExperience: [],
+      education: []
+    };
+  }
+  
+  // Transform and update profile data from frontend format to backend structure
   if (profileData) {
-    profile.profile = { ...profile.profile, ...profileData };
+    // Initialize nested objects properly
+    if (!profile.profile.personalInfo) profile.profile.personalInfo = {};
+    if (!profile.profile.contact) profile.profile.contact = {};
+    if (!profile.profile.skills) profile.profile.skills = { technical: [], soft: [], languages: [], tools: [] };
+    
+    // Map top-level fields to nested structure
+    if (profileData.fullName !== undefined) {
+      profile.profile.personalInfo.fullName = profileData.fullName;
+    }
+    
+    if (profileData.location !== undefined) {
+      if (!profile.profile.personalInfo.location) profile.profile.personalInfo.location = {};
+      profile.profile.personalInfo.location.city = profileData.location;
+    }
+    
+    if (profileData.bio !== undefined) {
+      profile.profile.bio = profileData.bio;
+    }
+    
+    // Contact information
+    if (profileData.email !== undefined) profile.profile.contact.email = profileData.email;
+    if (profileData.phone !== undefined) profile.profile.contact.phoneNumber = profileData.phone;
+    if (profileData.linkedin !== undefined) profile.profile.contact.linkedIn = profileData.linkedin;
+    if (profileData.github !== undefined) profile.profile.contact.github = profileData.github;
+    if (profileData.website !== undefined) profile.profile.contact.website = profileData.website;
+    
+    // Skills
+    if (profileData.skills !== undefined) {
+      profile.profile.skills.technical = profileData.skills;
+    }
+    
+    // Work experience and education
+    if (profileData.workExperience !== undefined) {
+      profile.profile.workExperience = profileData.workExperience;
+    }
+    if (profileData.education !== undefined) {
+      profile.profile.education = profileData.education;
+    }
+    
+    // Update position and company from first work experience if provided
+    if (profileData.position !== undefined || profileData.company !== undefined) {
+      if (!profile.profile.workExperience) profile.profile.workExperience = [];
+      if (profile.profile.workExperience.length === 0) {
+        profile.profile.workExperience.push({});
+      }
+      if (profileData.position !== undefined) {
+        profile.profile.workExperience[0].position = profileData.position;
+      }
+      if (profileData.company !== undefined) {
+        profile.profile.workExperience[0].company = profileData.company;
+      }
+    }
+    
+    // Industry
+    if (profileData.industry !== undefined) {
+      if (!profile.aiTags) profile.aiTags = {};
+      if (!profile.aiTags.industries) profile.aiTags.industries = [];
+      if (profileData.industry && !profile.aiTags.industries.includes(profileData.industry)) {
+        profile.aiTags.industries = [profileData.industry, ...profile.aiTags.industries];
+      }
+    }
+    
+    // Update only the profile subdocument properly
+    profile.markModified('profile');
   }
   
   // 更新社交设置
   if (socialSettings) {
-    profile.socialSettings = { ...profile.socialSettings, ...socialSettings };
+    // Deep merge socialSettings to avoid undefined overwrites
+    profile.socialSettings = {
+      isPublic: socialSettings.isPublic !== undefined ? socialSettings.isPublic : (profile.socialSettings?.isPublic ?? true),
+      acceptCollaborations: socialSettings.acceptCollaborations !== undefined ? socialSettings.acceptCollaborations : (profile.socialSettings?.acceptCollaborations ?? true),
+      showContactInfo: socialSettings.showContactInfo !== undefined ? socialSettings.showContactInfo : (profile.socialSettings?.showContactInfo ?? false),
+      privacy: {
+        showExperience: socialSettings.privacy?.showExperience !== undefined ? socialSettings.privacy.showExperience : (profile.socialSettings?.privacy?.showExperience ?? true),
+        showEducation: socialSettings.privacy?.showEducation !== undefined ? socialSettings.privacy.showEducation : (profile.socialSettings?.privacy?.showEducation ?? true),
+        showContact: socialSettings.privacy?.showContact !== undefined ? socialSettings.privacy.showContact : (profile.socialSettings?.privacy?.showContact ?? false),
+      }
+    };
+    profile.markModified('socialSettings');
   }
   
   // 更新协作偏好
   if (collaborationPreferences) {
-    profile.collaborationPreferences = { ...profile.collaborationPreferences, ...collaborationPreferences };
+    // Initialize collaborationPreferences if not exists
+    if (!profile.collaborationPreferences) {
+      profile.collaborationPreferences = {
+        projectTypes: [],
+        availability: {
+          timezone: 'Asia/Shanghai',
+          workingHours: { start: '09:00', end: '18:00' },
+          weekdays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+          hoursPerWeek: 20
+        },
+        workingStyle: { remote: true, inPerson: false, flexible: true },
+        communicationPrefs: { languages: ['zh'], channels: ['wechat', 'email'], responseTime: '24h' }
+      };
+    }
+    
+    // Update individual fields safely
+    if (collaborationPreferences.preferredProjectTypes !== undefined) {
+      profile.collaborationPreferences.projectTypes = collaborationPreferences.preferredProjectTypes;
+    }
+    if (collaborationPreferences.remoteWork !== undefined) {
+      profile.collaborationPreferences.workingStyle.remote = collaborationPreferences.remoteWork;
+    }
+    if (collaborationPreferences.availability !== undefined) {
+      // Handle string availability from frontend
+      if (typeof collaborationPreferences.availability === 'string') {
+        const hoursMap = { 'full-time': 40, 'part-time': 20, 'freelance': 10 };
+        profile.collaborationPreferences.availability.hoursPerWeek = hoursMap[collaborationPreferences.availability] || 20;
+      } else {
+        // Handle object availability
+        profile.collaborationPreferences.availability = {
+          ...profile.collaborationPreferences.availability,
+          ...collaborationPreferences.availability
+        };
+      }
+    }
+    
+    profile.markModified('collaborationPreferences');
   }
   
   await profile.save();
   await profile.populate('user', 'username email profile');
   
+  // Return transformed data structure matching frontend expectations
+  const transformedData = {
+    profile: {
+      fullName: profile.profile?.personalInfo?.fullName || '',
+      position: profile.profile?.workExperience?.[0]?.position || '',
+      location: profile.profile?.personalInfo?.location?.city || '',
+      bio: profile.profile?.bio || '',
+      company: profile.profile?.workExperience?.[0]?.company || '',
+      industry: profile.aiTags?.industries?.[0] || '',
+      experience: profile.profile?.workExperience?.length || 0,
+      skills: profile.profile?.skills?.technical || [],
+      workExperience: profile.profile?.workExperience || [],
+      education: profile.profile?.education || [],
+      email: profile.profile?.contact?.email || '',
+      phone: profile.profile?.contact?.phoneNumber || '',
+      linkedin: profile.profile?.contact?.linkedIn || '',
+      github: profile.profile?.contact?.github || '',
+      website: profile.profile?.contact?.website || '',
+    },
+    socialSettings: profile.socialSettings,
+    collaborationPreferences: {
+      preferredProjectTypes: profile.collaborationPreferences?.projectTypes || [],
+      availability: getAvailabilityString(profile.collaborationPreferences?.availability),
+      hourlyRate: 0,
+      currency: 'CNY',
+      remoteWork: profile.collaborationPreferences?.workingStyle?.remote ?? true,
+    },
+    stats: {
+      connectionCount: 0,
+      collaborationCount: 0,
+    }
+  };
+  
   res.status(200).json({
     success: true,
     message: '档案更新成功',
-    data: {
-      profile,
-      completeness: profile.completeness
-    }
+    data: transformedData
   });
 });
 
