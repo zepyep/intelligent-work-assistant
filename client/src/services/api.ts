@@ -1,8 +1,37 @@
 import axios from 'axios';
 
 // Base API configuration
-// 在开发环境使用代理，在生产环境使用相对路径
-const API_BASE_URL = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api');
+// 优先使用环境变量，然后检查是否在Clacky环境或本地开发环境
+const getApiBaseUrl = () => {
+  // 1. 如果设置了明确的API URL环境变量，优先使用
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  
+  // 2. 检查是否在Clacky环境（通过hostname或特定标识）
+  const isClackyEnv = window.location.hostname.includes('clacky') || 
+                     window.location.hostname.includes('codespace') ||
+                     window.location.hostname.includes('github') ||
+                     process.env.NODE_ENV !== 'production';
+  
+  // 3. 在Clacky或开发环境中使用代理（相对路径）
+  if (isClackyEnv) {
+    return '/api';
+  }
+  
+  // 4. 其他生产环境使用相对路径
+  return '/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Debug logging for API configuration
+console.log('🔧 API Configuration:', {
+  baseURL: API_BASE_URL,
+  hostname: window.location.hostname,
+  nodeEnv: process.env.NODE_ENV,
+  customApiUrl: process.env.REACT_APP_API_URL
+});
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

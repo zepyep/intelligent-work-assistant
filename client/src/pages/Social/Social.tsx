@@ -47,6 +47,7 @@ import {
   TrendingUp,
 } from '@mui/icons-material';
 import { useAuth } from '../../hooks/useAuth';
+import { apiClient } from '../../services/api';
 import SocialProfile from './components/SocialProfile';
 import UserSearch from './components/UserSearch';
 import Recommendations from './components/Recommendations';
@@ -85,23 +86,8 @@ const Social: React.FC = () => {
     const fetchSocialProfile = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/social/profile', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        if (data.success) {
-          setSocialProfile(data.data);
-        } else {
-          setError('Failed to load social profile');
-        }
+        const data = await apiClient.get('/social/profile');
+        setSocialProfile(data);
       } catch (err) {
         console.error('Error fetching social profile:', err);
         setError('Failed to load social profile');
