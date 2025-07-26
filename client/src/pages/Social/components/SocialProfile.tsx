@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { apiClient } from '../../../services/api';
 import {
   Box,
   Grid,
@@ -165,46 +166,30 @@ const SocialProfile: React.FC<SocialProfileProps> = ({ profile, onProfileUpdate 
       setLoading(true);
       setError(null);
 
-      const response = await fetch('/api/social/profile', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
+      const data = await apiClient.put('/social/profile', {
+        profile: {
+          fullName: formData.fullName,
+          position: formData.position,
+          location: formData.location,
+          bio: formData.bio,
+          company: formData.company,
+          industry: formData.industry,
+          experience: formData.experience,
+          skills: formData.skills,
+          workExperience: formData.workExperience,
+          education: formData.education,
+          email: formData.email,
+          phone: formData.phone,
+          linkedin: formData.linkedin,
+          github: formData.github,
+          website: formData.website,
         },
-        body: JSON.stringify({
-          profile: {
-            fullName: formData.fullName,
-            position: formData.position,
-            location: formData.location,
-            bio: formData.bio,
-            company: formData.company,
-            industry: formData.industry,
-            experience: formData.experience,
-            skills: formData.skills,
-            workExperience: formData.workExperience,
-            education: formData.education,
-            email: formData.email,
-            phone: formData.phone,
-            linkedin: formData.linkedin,
-            github: formData.github,
-            website: formData.website,
-          },
-          socialSettings: formData.socialSettings,
-          collaborationPreferences: formData.collaborationPreferences,
-        }),
+        socialSettings: formData.socialSettings,
+        collaborationPreferences: formData.collaborationPreferences,
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (data.success) {
-        onProfileUpdate(data.data);
-        setEditing(false);
-      } else {
-        setError('Failed to update profile');
-      }
+      
+      onProfileUpdate(data);
+      setEditing(false);
     } catch (err) {
       console.error('Error updating profile:', err);
       setError('Failed to update profile');
