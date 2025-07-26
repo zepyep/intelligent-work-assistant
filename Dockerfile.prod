@@ -1,0 +1,80 @@
+# 智能工作助手应用 - 生产环境多阶段构建 Dockerfile
+# ============================================
+
+# 阶段1: 构建前端应用
+FROM node:18-alpine AS frontend-builder
+
+LABEL maintainer="Smart Work Assistant Team"
+LABEL description="智能工作助手应用 - 前端构建阶段"
+
+WORKDIR /app/client
+
+# 复制前端依赖文件
+COPY client/package*.json ./
+RUN npm ci --only=production --silent
+
+# 复制前端源码并构建
+COPY client/ ./
+ENV NODE_ENV=production
+ENV CI=false
+RUN npm run build
+
+# 阶段2: 准备后端应用
+FROM node:18-alpine AS backend-builder
+
+WORKDIR /app/server
+
+# 复制后端依赖文件
+COPY server/package*.json ./
+RUN npm ci --only=production --silent
+
+# 复制后端源码
+COPY server/ ./
+
+# 阶段3: 生产环境运行时
+FROM node:18-alpine AS production
+
+# 设置环境标识
+ENV NODE_ENV=production
+ENV PORT=5000
+
+# 安装系统依赖
+RUN apk add --no-cache \
+    dumb-init \
+    curl \
+    tzdata && \
+    # 设置时区
+    cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    echo "Asia/Shanghai" > /etc/timezone
+
+# 创建应用用户（安全最佳实践）
+RUN addgroup -g 1001 -S appuser && \
+    adduser -S appuser -u 1001 -G appuser
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制应用文件
+COPY --from=backend-builder --chown=appuser:appuser /app/server ./server
+COPY --from=frontend-builder --chown=appuser:appuser /app/client/build ./server/public
+
+# 创建必要的目录
+RUN mkdir -p ./server/uploads/audio ./server/uploads/documents ./server/uploads/images ./server/uploads/temp && \
+    chown -R appuser:appuser ./server/uploads
+
+# 切换到非root用户
+USER appuser
+
+# 设置工作目录到server
+WORKDIR /app/server
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:$PORT/health || exit 1
+
+# 暴露端口
+EXPOSE $PORT
+
+# 启动应用
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "index.js"]

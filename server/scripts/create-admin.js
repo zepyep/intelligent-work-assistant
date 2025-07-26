@@ -18,21 +18,38 @@ const createAdmin = async () => {
   try {
     await connectDB();
     
-    // 找到admin用户并更新为管理员角色
-    const admin = await User.findOneAndUpdate(
-      { email: 'admin@example.com' },
-      { role: 'admin' },
-      { new: true }
-    );
-
+    // 先查找是否已存在admin用户
+    let admin = await User.findOne({ email: 'admin@example.com' });
+    
     if (admin) {
+      // 如果存在，更新为管理员角色
+      admin = await User.findOneAndUpdate(
+        { email: 'admin@example.com' },
+        { role: 'admin' },
+        { new: true }
+      );
       console.log('管理员角色更新成功:');
-      console.log(`- 用户名: ${admin.username}`);
-      console.log(`- 邮箱: ${admin.email}`);
-      console.log(`- 角色: ${admin.role}`);
     } else {
-      console.log('未找到admin用户');
+      // 如果不存在，创建新的admin用户
+      const bcrypt = require('bcryptjs');
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash('admin123', salt);
+      
+      admin = await User.create({
+        username: 'admin',
+        email: 'admin@example.com',
+        password: hashedPassword,
+        fullName: '系统管理员',
+        role: 'admin',
+        isActive: true
+      });
+      console.log('管理员用户创建成功:');
     }
+    
+    console.log(`- 用户名: ${admin.username}`);
+    console.log(`- 邮箱: ${admin.email}`);
+    console.log(`- 角色: ${admin.role}`);
+    console.log('- 密码: admin123');
 
     process.exit(0);
   } catch (error) {

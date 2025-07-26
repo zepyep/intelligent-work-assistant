@@ -6,7 +6,10 @@ const {
   unbindWechat,
   getWechatProfile,
   sendWechatMessage,
-  handleWebhook
+  handleWebhook,
+  createWechatMenu,
+  getWechatMenu,
+  deleteWechatMenu
 } = require('../controllers/wechatController');
 const { protect } = require('../middleware/auth');
 
@@ -31,5 +34,10 @@ router.get('/profile', getWechatProfile);
 
 // 发送微信消息（管理员功能）
 router.post('/send-message', sendWechatMessage);
+
+// 微信菜单管理
+router.post('/menu/create', createWechatMenu);
+router.get('/menu', getWechatMenu);
+router.delete('/menu', deleteWechatMenu);
 
 module.exports = router;

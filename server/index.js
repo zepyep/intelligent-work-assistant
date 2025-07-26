@@ -6,6 +6,7 @@ require('dotenv').config();
 
 const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
+const { specs, swaggerUi, swaggerOptions } = require('./config/swagger');
 
 // 路由导入
 const authRoutes = require('./routes/auth');
@@ -17,6 +18,7 @@ const calendarRoutes = require('./routes/calendar');
 const wechatRoutes = require('./routes/wechat');
 const wechatAdminRoutes = require('./routes/wechat-admin');
 const aiRoutes = require('./routes/ai');
+const notificationRoutes = require('./routes/notification');
 
 const app = express();
 
@@ -49,6 +51,13 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // 静态文件服务
 app.use('/uploads', express.static('uploads'));
 
+// API文档
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, swaggerOptions));
+app.get('/api/docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(specs);
+});
+
 // 健康检查
 app.get('/health', (req, res) => {
   res.status(200).json({
@@ -69,6 +78,7 @@ app.use('/api/calendar', calendarRoutes);
 app.use('/api/wechat', wechatRoutes);
 app.use('/api/wechat-admin', wechatAdminRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // 微信公众号 webhook（需要在根路径）
 app.use('/wechat', require('./routes/wechat-webhook'));
@@ -86,16 +96,40 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   console.log(`🚀 智能工作助手服务器启动成功`);
   console.log(`📍 服务器地址: http://localhost:${PORT}`);
+  console.log(`📚 API文档: http://localhost:${PORT}/api-docs`);
   console.log(`🌍 环境: ${process.env.NODE_ENV || 'development'}`);
   console.log(`⚡ 进程ID: ${process.pid}`);
+  
+  // 初始化微信公众号菜单
+  try {
+    const { initializeWechatMenu } = require('./services/wechatMenuService');
+    await initializeWechatMenu();
+  } catch (error) {
+    console.log('⚠️  微信菜单初始化跳过:', error.message);
+  }
+  
+  // 初始化通知调度器
+  try {
+    const SchedulerService = require('./services/schedulerService');
+    global.schedulerService = new SchedulerService();
+    await global.schedulerService.initialize();
+  } catch (error) {
+    console.log('⚠️  通知调度器初始化跳过:', error.message);
+  }
 });
 
 // 优雅关闭
 process.on('SIGTERM', () => {
   console.log('收到SIGTERM信号，正在优雅关闭服务器...');
+  
+  // 停止调度器
+  if (global.schedulerService) {
+    global.schedulerService.stopAll();
+  }
+  
   server.close(() => {
     console.log('服务器已关闭');
     process.exit(0);
@@ -104,6 +138,12 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
   console.log('收到SIGINT信号，正在优雅关闭服务器...');
+  
+  // 停止调度器
+  if (global.schedulerService) {
+    global.schedulerService.stopAll();
+  }
+  
   server.close(() => {
     console.log('服务器已关闭');
     process.exit(0);

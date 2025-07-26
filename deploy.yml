@@ -1,0 +1,386 @@
+# GitHub Actions CI/CD Pipeline for Intelligent Work Assistant
+# 智能工作助手 CI/CD 部署管道
+
+name: Deploy Intelligent Work Assistant
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '18.x'
+  DOCKER_REGISTRY: 'ghcr.io'
+  IMAGE_NAME: 'intelligent-work-assistant'
+
+jobs:
+  # ================================
+  # 测试和代码质量检查
+  # ================================
+  test-and-quality:
+    runs-on: ubuntu-latest
+    
+    services:
+      mongodb:
+        image: mongo:5.0
+        ports:
+          - 27017:27017
+        env:
+          MONGO_INITDB_ROOT_USERNAME: testuser
+          MONGO_INITDB_ROOT_PASSWORD: testpassword
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand({ping: 1})'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install Dependencies - Server
+      run: |
+        cd server
+        npm ci
+        
+    - name: Install Dependencies - Client
+      run: |
+        cd client
+        npm ci
+        
+    - name: Run Security Check
+      run: |
+        cd server
+        node scripts/security-check.js || true
+        
+    - name: Run Backend Tests
+      env:
+        NODE_ENV: test
+        MONGODB_URI: mongodb://testuser:testpassword@localhost:27017/test_db?authSource=admin
+        JWT_SECRET: test-jwt-secret-for-ci
+      run: |
+        cd server
+        npm test
+        
+    - name: Run Backend Linting
+      run: |
+        cd server
+        npm run lint || true
+        
+    - name: Build Frontend
+      run: |
+        cd client
+        npm run build
+        
+    - name: Run Frontend Tests
+      run: |
+        cd client
+        npm test -- --coverage --watchAll=false
+        
+    - name: Frontend Type Check
+      run: |
+        cd client
+        npm run type-check || true
+        
+    - name: Upload Coverage Reports
+      uses: codecov/codecov-action@v4
+      with:
+        directory: ./coverage
+        flags: unittests
+        name: codecov-umbrella
+        
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarcloud-github-action@master
+      if: github.event_name == 'push'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  # ================================
+  # 安全扫描
+  # ================================
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: test-and-quality
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: Run Trivy Vulnerability Scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy Scan Results
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-results.sarif'
+        
+    - name: npm Audit
+      run: |
+        cd server
+        npm audit --audit-level=high --json > audit-results.json || true
+        cd ../client  
+        npm audit --audit-level=high --json > audit-results.json || true
+
+  # ================================
+  # 构建 Docker 镜像
+  # ================================
+  build-image:
+    runs-on: ubuntu-latest
+    needs: [test-and-quality, security-scan]
+    if: github.event_name == 'push'
+    
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Login to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.DOCKER_REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Extract Metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+          
+    - name: Build and Push Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.prod
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64,linux/arm64
+
+  # ================================
+  # 部署到测试环境
+  # ================================
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build-image
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.STAGING_SSH_KEY }}
+        
+    - name: Deploy to Staging Server
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
+          cd /opt/intelligent-work-assistant
+          docker-compose -f docker-compose.staging.yml pull
+          docker-compose -f docker-compose.staging.yml up -d
+          docker system prune -f
+        EOF
+        
+    - name: Health Check - Staging
+      run: |
+        sleep 30
+        curl -f https://staging.intelligent-assistant.com/health || exit 1
+        
+    - name: Run Integration Tests
+      run: |
+        cd server
+        npm run test:integration -- --baseURL=https://staging.intelligent-assistant.com
+
+  # ================================
+  # 部署到生产环境
+  # ================================
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [build-image, deploy-staging]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.PRODUCTION_SSH_KEY }}
+        
+    - name: Blue-Green Deployment Preparation
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} << 'EOF'
+          cd /opt/intelligent-work-assistant
+          
+          # Create backup of current version
+          docker-compose -f docker-compose.prod.yml stop
+          docker tag ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest \
+                     ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:backup-$(date +%Y%m%d-%H%M%S)
+          
+          # Pull new version
+          docker pull ${{ needs.build-image.outputs.image-tag }}
+          docker tag ${{ needs.build-image.outputs.image-tag }} \
+                     ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest
+        EOF
+        
+    - name: Deploy to Production
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} << 'EOF'
+          cd /opt/intelligent-work-assistant
+          
+          # Start new version
+          docker-compose -f docker-compose.prod.yml up -d
+          
+          # Wait for health check
+          for i in {1..30}; do
+            if curl -f https://intelligent-assistant.com/health; then
+              echo "Health check passed"
+              break
+            fi
+            echo "Waiting for service to be ready... ($i/30)"
+            sleep 10
+          done
+        EOF
+        
+    - name: Health Check - Production
+      run: |
+        curl -f https://intelligent-assistant.com/health || exit 1
+        curl -f https://intelligent-assistant.com/api-docs || exit 1
+        
+    - name: Smoke Tests
+      run: |
+        cd server
+        npm run test:smoke -- --baseURL=https://intelligent-assistant.com
+        
+    - name: Update Load Balancer
+      run: |
+        # Update load balancer configuration if needed
+        echo "Production deployment completed successfully"
+
+  # ================================
+  # 部署后检查和通知
+  # ================================
+  post-deployment:
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: always()
+    
+    steps:
+    - name: Deployment Status Check
+      run: |
+        if [ "${{ needs.deploy-production.result }}" == "success" ]; then
+          echo "✅ Production deployment successful"
+          echo "DEPLOYMENT_STATUS=success" >> $GITHUB_ENV
+        else
+          echo "❌ Production deployment failed"
+          echo "DEPLOYMENT_STATUS=failure" >> $GITHUB_ENV
+        fi
+        
+    - name: Send Deployment Notification
+      uses: 8398a7/action-slack@v3
+      with:
+        status: custom
+        custom_payload: |
+          {
+            username: 'GitHub Actions',
+            icon_emoji: ':rocket:',
+            attachments: [{
+              color: '${{ env.DEPLOYMENT_STATUS }}' === 'success' ? 'good' : 'danger',
+              fields: [{
+                title: '🤖 Intelligent Work Assistant Deployment',
+                value: 'Status: ${{ env.DEPLOYMENT_STATUS }}\nBranch: ${{ github.ref }}\nCommit: ${{ github.sha }}\nAuthor: ${{ github.actor }}',
+                short: false
+              }]
+            }]
+          }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        
+    - name: Create GitHub Release
+      if: github.ref == 'refs/heads/main' && env.DEPLOYMENT_STATUS == 'success'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}
+        release_name: Release v${{ github.run_number }}
+        body: |
+          ## 🎉 智能工作助手新版本发布
+          
+          ### 📋 本次发布内容:
+          - 完整的智能工作助手应用
+          - 任务规划、文档分析、会议音频处理功能
+          - 微信公众号集成
+          - 日程同步功能
+          - 全面的安全防护
+          
+          ### 🔗 相关链接:
+          - [生产环境](https://intelligent-assistant.com)
+          - [API文档](https://intelligent-assistant.com/api-docs)
+          - [用户手册](https://github.com/${{ github.repository }}/wiki)
+          
+          **Commit:** ${{ github.sha }}
+          **Author:** ${{ github.actor }}
+        draft: false
+        prerelease: false
+
+  # ================================  
+  # 性能和监控检查
+  # ================================
+  monitoring-setup:
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Setup Monitoring Alerts
+      run: |
+        # Configure application monitoring
+        echo "Setting up monitoring and alerts..."
+        
+        # This could integrate with monitoring services like:
+        # - New Relic
+        # - DataDog  
+        # - Prometheus + Grafana
+        # - Application Insights
+        
+    - name: Performance Benchmark
+      run: |
+        # Run performance tests against production
+        echo "Running performance benchmarks..."
+        
+        # This could use tools like:
+        # - Artillery.io
+        # - Apache Bench
+        # - k6
+        # - Lighthouse CI

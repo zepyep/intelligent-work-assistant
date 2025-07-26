@@ -1,6 +1,6 @@
 const { google } = require('googleapis');
 const { Client } = require('@microsoft/microsoft-graph-client');
-const ical = require('ical-generator');
+const { ICalCalendar } = require('ical-generator');
 const { v4: uuidv4 } = require('uuid');
 const Calendar = require('../models/Calendar');
 const User = require('../models/User');
@@ -458,7 +458,7 @@ class CalendarSyncService {
         }
       });
 
-      const calendar = ical({
+      const calendar = new ICalCalendar({
         domain: 'intelligent-work-assistant.com',
         name: `${user.profile.fullName || user.username} 的工作日程`,
         timezone: 'Asia/Shanghai'

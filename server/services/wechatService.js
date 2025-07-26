@@ -269,6 +269,61 @@ class WechatService {
       throw error;
     }
   }
+
+  /**
+   * 发送通知消息
+   * @param {string} openId 用户openId
+   * @param {Object} notification 通知对象
+   */
+  async sendNotification(openId, notification) {
+    try {
+      if (!this.api) {
+        console.log('微信API未配置，模拟发送通知:', notification.title);
+        return { success: true, message: 'Mock WeChat notification sent' };
+      }
+
+      let message = `📢 ${notification.title}\n\n${notification.content}`;
+      
+      // 根据通知类型添加emoji
+      const typeEmoji = {
+        info: 'ℹ️',
+        warning: '⚠️',
+        error: '❌',
+        success: '✅'
+      };
+      
+      message = `${typeEmoji[notification.type] || 'ℹ️'} ${notification.title}\n\n${notification.content}`;
+      
+      // 添加时间信息
+      message += `\n\n🕐 发送时间: ${new Date().toLocaleString()}`;
+      
+      const result = await this.sendTextMessage(openId, message);
+      return { success: true, result };
+    } catch (error) {
+      console.error('发送微信通知失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 批量发送通知
+   * @param {Array} openIds 用户openId数组
+   * @param {Object} notification 通知对象
+   */
+  async broadcastNotification(openIds, notification) {
+    const results = [];
+    
+    for (const openId of openIds) {
+      try {
+        const result = await this.sendNotification(openId, notification);
+        results.push({ openId, success: true, result });
+      } catch (error) {
+        results.push({ openId, success: false, error: error.message });
+      }
+    }
+
+    return results;
+  }
 }
 
-module.exports = new WechatService();
+module.exports = WechatService;

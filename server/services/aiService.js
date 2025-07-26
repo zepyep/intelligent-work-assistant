@@ -43,13 +43,28 @@ class AIService {
       console.log('✅ Claude客户端配置完成');
     }
 
-    // 通义千问客户端 (阿里云)
+    // 通义千问客户端 (阿里云DashScope)
     if (process.env.QWEN_API_KEY) {
       this.clients.qwen = {
         apiKey: process.env.QWEN_API_KEY,
-        baseURL: process.env.QWEN_API_URL || 'https://dashscope.aliyuncs.com/api/v1'
+        baseURL: process.env.QWEN_API_URL || 'https://dashscope.aliyuncs.com/api/v1',
+        model: process.env.QWEN_MODEL || 'qwen-turbo'
       };
       console.log('✅ 通义千问客户端配置完成');
+      console.log(`   模型: ${this.clients.qwen.model}`);
+      console.log(`   API地址: ${this.clients.qwen.baseURL}`);
+    }
+
+    // PPIO派欧云平台客户端
+    if (process.env.PPIO_API_KEY) {
+      this.clients.ppio = {
+        apiKey: process.env.PPIO_API_KEY,
+        baseURL: process.env.PPIO_API_URL || 'https://api.ppio.cloud/v1',
+        model: process.env.PPIO_MODEL || 'gpt-3.5-turbo'
+      };
+      console.log('✅ PPIO派欧云平台客户端配置完成');
+      console.log(`   模型: ${this.clients.ppio.model}`);
+      console.log(`   API地址: ${this.clients.ppio.baseURL}`);
     }
 
     // 文心一言客户端 (百度)
@@ -108,6 +123,8 @@ class AIService {
           return await this.callOpenAI(prompt, systemPrompt, model, temperature, maxTokens);
         case 'claude':
           return await this.callClaude(prompt, systemPrompt, model, temperature, maxTokens);
+        case 'ppio':
+          return await this.callPPIO(prompt, systemPrompt, model, temperature, maxTokens);
         case 'qwen':
           return await this.callQwen(prompt, systemPrompt, model, temperature, maxTokens);
         case 'ernie':
@@ -168,34 +185,125 @@ class AIService {
   }
 
   /**
-   * 通义千问调用 (阿里云)
+   * PPIO派欧云平台调用
+   * 使用Bearer认证方式，兼容OpenAI API格式
    */
-  async callQwen(prompt, systemPrompt, model, temperature, maxTokens) {
-    const response = await axios.post(
-      `${this.clients.qwen.baseURL}/services/aigc/text-generation/generation`,
-      {
-        model: model || 'qwen-turbo',
-        input: {
+  async callPPIO(prompt, systemPrompt, model, temperature, maxTokens) {
+    try {
+      const response = await axios.post(
+        `${this.clients.ppio.baseURL}/chat/completions`,
+        {
+          model: model || process.env.PPIO_MODEL || 'gpt-3.5-turbo',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: prompt }
-          ]
+          ],
+          temperature: temperature || 0.7,
+          max_tokens: maxTokens || 2000,
+          top_p: 0.9,
+          frequency_penalty: 0,
+          presence_penalty: 0
         },
-        parameters: {
-          temperature,
-          max_tokens: maxTokens,
-          top_p: 0.8
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.clients.ppio.apiKey}`
+          }
         }
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.clients.qwen.apiKey}`
+      );
+
+      // 处理PPIO的响应格式 (兼容OpenAI)
+      if (response.data && response.data.choices && response.data.choices[0]) {
+        return response.data.choices[0].message?.content || response.data.choices[0].text || '抱歉，PPIO AI服务暂时无法响应。';
+      }
+      
+      throw new Error('PPIO API响应格式异常');
+    } catch (error) {
+      console.error('PPIO API调用失败:', error.response?.data || error.message);
+      
+      // 检查是否是API密钥错误
+      if (error.response?.status === 401) {
+        console.warn('⚠️  PPIO API密钥无效或过期，将使用模拟响应');
+        // 在开发环境下，如果API密钥无效，返回模拟数据
+        if (process.env.NODE_ENV === 'development') {
+          return '抱歉，PPIO派欧云平台API密钥需要正确配置。请检查API密钥是否有效、是否具有足够的调用额度。此文本为模拟响应。';
         }
       }
-    );
+      
+      // 其他错误处理
+      if (error.response) {
+        const status = error.response.status;
+        const errorData = error.response.data;
+        
+        if (status === 429) {
+          throw new Error(`PPIO API调用频率过高 (${status}): 请稍后重试`);
+        } else if (status === 400) {
+          throw new Error(`PPIO API请求参数错误 (${status}): ${errorData?.error?.message || '参数错误'}`);
+        } else {
+          throw new Error(`PPIO API错误 (${status}): ${errorData?.error?.message || errorData?.message || '未知错误'}`);
+        }
+      }
+      
+      throw new Error(`PPIO服务调用失败: ${error.message}`);
+    }
+  }
 
-    return response.data.output.text;
+  /**
+   * 通义千问调用 (阿里云DashScope)
+   */
+  async callQwen(prompt, systemPrompt, model, temperature, maxTokens) {
+    try {
+      const response = await axios.post(
+        `${this.clients.qwen.baseURL}/services/aigc/text-generation/generation`,
+        {
+          model: model || process.env.QWEN_MODEL || 'qwen-turbo',
+          input: {
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: prompt }
+            ]
+          },
+          parameters: {
+            temperature: temperature || 0.7,
+            max_tokens: maxTokens || 2000,
+            top_p: 0.8,
+            result_format: 'text'
+          }
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.clients.qwen.apiKey}`,
+            'X-DashScope-SSE': 'disable'
+          }
+        }
+      );
+
+      // 处理通义千问的响应格式
+      if (response.data && response.data.output) {
+        return response.data.output.text || response.data.output.choices?.[0]?.message?.content || '抱歉，AI服务暂时无法响应。';
+      }
+      
+      throw new Error('通义千问API响应格式异常');
+    } catch (error) {
+      console.error('通义千问API调用失败:', error.response?.data || error.message);
+      
+      // 检查是否是API密钥错误
+      if (error.response?.status === 401 || error.response?.data?.code === 'InvalidApiKey') {
+        console.warn('⚠️  通义千问API密钥无效，将使用模拟响应');
+        // 在开发环境下，如果API密钥无效，返回模拟数据
+        if (process.env.NODE_ENV === 'development') {
+          return '抱歉，通义千问API密钥需要正确配置。请检查API密钥是否有效、是否具有足够的调用额度，并确认已开通相关服务。此文本为模拟响应。';
+        }
+      }
+      
+      // 如果是网络错误或API错误，抛出具体错误信息
+      if (error.response) {
+        throw new Error(`通义千问API错误 (${error.response.status}): ${error.response.data?.message || error.response.data?.code || '未知错误'}`);
+      }
+      
+      throw new Error(`通义千问服务调用失败: ${error.message}`);
+    }
   }
 
   /**

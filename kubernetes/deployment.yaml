@@ -1,0 +1,417 @@
+# Kubernetes 部署配置
+# Intelligent Work Assistant Kubernetes Deployment
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: intelligent-work-assistant
+  labels:
+    name: intelligent-work-assistant
+
+---
+# ConfigMap for application configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: iwa-config
+  namespace: intelligent-work-assistant
+data:
+  NODE_ENV: "production"
+  CLIENT_URL: "https://intelligent-assistant.com"
+  CONTAINER_MODE: "true"
+
+---
+# Secret for sensitive configuration
+apiVersion: v1
+kind: Secret
+metadata:
+  name: iwa-secrets
+  namespace: intelligent-work-assistant
+type: Opaque
+data:
+  # Base64 encoded secrets (replace with actual values)
+  JWT_SECRET: <BASE64_ENCODED_JWT_SECRET>
+  MONGODB_URI: <BASE64_ENCODED_MONGODB_URI>
+  OPENAI_API_KEY: <BASE64_ENCODED_OPENAI_API_KEY>
+  WECHAT_APP_SECRET: <BASE64_ENCODED_WECHAT_APP_SECRET>
+
+---
+# MongoDB Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: intelligent-work-assistant
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+      - name: mongodb
+        image: mongo:6.0
+        ports:
+        - containerPort: 27017
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          value: "admin"
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: iwa-secrets
+              key: MONGODB_ROOT_PASSWORD
+        volumeMounts:
+        - name: mongodb-data
+          mountPath: /data/db
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: mongodb-data
+        persistentVolumeClaim:
+          claimName: mongodb-pvc
+
+---
+# MongoDB Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+  namespace: intelligent-work-assistant
+spec:
+  selector:
+    app: mongodb
+  ports:
+  - protocol: TCP
+    port: 27017
+    targetPort: 27017
+
+---
+# Redis Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: intelligent-work-assistant
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        command: ["redis-server"]
+        args: ["--requirepass", "$(REDIS_PASSWORD)", "--appendonly", "yes"]
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: iwa-secrets
+              key: REDIS_PASSWORD
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: redis-data
+        persistentVolumeClaim:
+          claimName: redis-pvc
+
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: intelligent-work-assistant
+spec:
+  selector:
+    app: redis
+  ports:
+  - protocol: TCP
+    port: 6379
+    targetPort: 6379
+
+---
+# Application Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iwa-app
+  namespace: intelligent-work-assistant
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: iwa-app
+  template:
+    metadata:
+      labels:
+        app: iwa-app
+    spec:
+      containers:
+      - name: iwa-app
+        image: intelligent-work-assistant:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: iwa-config
+              key: NODE_ENV
+        - name: CLIENT_URL
+          valueFrom:
+            configMapKeyRef:
+              name: iwa-config
+              key: CLIENT_URL
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: iwa-secrets
+              key: JWT_SECRET
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: iwa-secrets
+              key: MONGODB_URI
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: iwa-secrets
+              key: OPENAI_API_KEY
+        volumeMounts:
+        - name: app-uploads
+          mountPath: /app/uploads
+        - name: app-logs
+          mountPath: /app/logs
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: app-uploads
+        persistentVolumeClaim:
+          claimName: app-uploads-pvc
+      - name: app-logs
+        persistentVolumeClaim:
+          claimName: app-logs-pvc
+
+---
+# Application Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: iwa-app-service
+  namespace: intelligent-work-assistant
+spec:
+  selector:
+    app: iwa-app
+  ports:
+  - protocol: TCP
+    port: 5000
+    targetPort: 5000
+  type: ClusterIP
+
+---
+# Ingress Configuration
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: iwa-ingress
+  namespace: intelligent-work-assistant
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  tls:
+  - hosts:
+    - intelligent-assistant.com
+    secretName: iwa-tls-cert
+  rules:
+  - host: intelligent-assistant.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: iwa-app-service
+            port:
+              number: 5000
+
+---
+# Persistent Volume Claims
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+  namespace: intelligent-work-assistant
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: gp2
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: intelligent-work-assistant
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: gp2
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app-uploads-pvc
+  namespace: intelligent-work-assistant
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: gp2
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app-logs-pvc
+  namespace: intelligent-work-assistant
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: gp2
+
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: iwa-app-hpa
+  namespace: intelligent-work-assistant
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: iwa-app
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# Network Policy for Security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: iwa-network-policy
+  namespace: intelligent-work-assistant
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: nginx-ingress
+    ports:
+    - protocol: TCP
+      port: 5000
+  - from:
+    - podSelector:
+        matchLabels:
+          app: iwa-app
+    ports:
+    - protocol: TCP
+      port: 27017
+    - protocol: TCP
+      port: 6379
+  egress:
+  - {}
+
+---
+# Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: iwa-app-monitor
+  namespace: intelligent-work-assistant
+spec:
+  selector:
+    matchLabels:
+      app: iwa-app
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
